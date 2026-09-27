@@ -1,0 +1,347 @@
+import { Button, ListView, ScrollView, ProgressIndicator, Spinner, LineEdit } from "std-widgets.slint";
+import { Theme } from "theme.slint";
+import { Icons } from "icons.slint";
+import { Api, LibraryRow, TagRow } from "api.slint";
+import {
+    Icon, Label, Badge, CapabilityBadge, ToolButton, SearchField, EmptyState, Divider, VDivider, Toolbar, MenuButton, MenuEntry
+} from "components.slint";
+
+export global LibraryFilters {
+    public pure function title(filter: int) -> string {
+        if filter == 1 { return @tr("Vision"); }
+        if filter == 2 { return @tr("Tools"); }
+        if filter == 3 { return @tr("Thinking"); }
+        if filter == 4 { return @tr("Embedding"); }
+        if filter == 5 { return @tr("Cloud"); }
+        return @tr("All Capabilities");
+    }
+}
+
+component ResultRow inherits Rectangle {
+    in property <LibraryRow> data;
+    property <bool> selected: Api.library-selected == data.path;
+    border-radius: Theme.radius;
+    background: selected ? Theme.selection : touch.has-hover ? Theme.hover : transparent;
+    touch := TouchArea {
+        clicked => { Api.select-library(root.data.path); }
+    }
+    VerticalLayout {
+        padding: 10px;
+        spacing: 4px;
+        HorizontalLayout {
+            spacing: 6px;
+            Label {
+                text: root.data.name;
+                strong: true;
+                horizontal-stretch: 1;
+                max-width: self.preferred-width;
+            }
+            if root.data.installed: Icon {
+                icon: Icons.check-circle;
+                tint: Theme.green;
+                size: 14px;
+                y: (parent.height - self.height) / 2;
+                Tooltip { text: @markdown("\{@tr("Installed")}"); }
+            }
+            Rectangle { horizontal-stretch: 1; }
+            if root.data.pulls != "": HorizontalLayout {
+                spacing: 3px;
+                Icon {
+                    icon: Icons.download;
+                    size: 11px;
+                    tint: Theme.text-secondary;
+                    y: (parent.height - self.height) / 2;
+                }
+                Label {
+                    text: root.data.pulls;
+                    small: true;
+                    secondary: true;
+                }
+            }
+        }
+        if root.data.summary != "": Text {
+            text: root.data.summary;
+            font-size: Theme.small-font-size;
+            color: Theme.text-secondary;
+            wrap: word-wrap;
+            max-height: 3 * Theme.small-font-size * 1.3;
+            overflow: elide;
+        }
+        HorizontalLayout {
+            spacing: 4px;
+            alignment: start;
+            for capability in root.data.capabilities: CapabilityBadge { capability: capability; }
+            for size in root.data.sizes: Badge { text: size; tint: Theme.blue; }
+        }
+    }
+}
+
+component TagAction inherits HorizontalLayout {
+    in property <TagRow> data;
+    alignment: end;
+    if root.data.state == 1: ProgressIndicator {
+        width: 64px;
+        height: 6px;
+        y: (parent.height - self.height) / 2;
+        indeterminate: root.data.progress < 0;
+        progress: max(root.data.progress, 0);
+    }
+    if root.data.state == 2: HorizontalLayout {
+        spacing: 4px;
+        Icon {
+            icon: Icons.check;
+            tint: Theme.green;
+            size: 13px;
+            y: (parent.height - self.height) / 2;
+        }
+        Label {
+            text: @tr("Installed");
+            color: Theme.green;
+        }
+    }
+    if root.data.state == 0: Button {
+        text: @tr("Pull");
+        enabled: Api.connection == 1;
+        clicked => { Api.pull(root.data.name); }
+    }
+}
+
+component TagsTable inherits VerticalLayout {
+    Rectangle {
+        height: 28px;
+        HorizontalLayout {
+            padding-left: 28px;
+            padding-right: 24px;
+            spacing: 8px;
+            Label { text: @tr("Tag"); small: true; secondary: true; strong: true; horizontal-stretch: 1; }
+            Label { text: @tr("Size"); small: true; secondary: true; strong: true; width: 120px; }
+            Label { text: @tr("Context"); small: true; secondary: true; strong: true; width: 70px; }
+            Label { text: @tr("Input"); small: true; secondary: true; strong: true; width: 140px; }
+            Rectangle { width: 100px; }
+        }
+    }
+    ListView {
+        for tag[index] in Api.tags: Rectangle {
+            height: 36px;
+            background: Math.mod(index, 2) == 0 ? Theme.zebra : transparent;
+            HorizontalLayout {
+                padding-left: 28px;
+                padding-right: 24px;
+                spacing: 8px;
+                HorizontalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 6px;
+                    Text {
+                        text: tag.tag;
+                        font-family: Theme.is-macos ? "Menlo" : "Consolas";
+                        font-size: Theme.font-size;
+                        color: Theme.text;
+                        vertical-alignment: center;
+                        overflow: elide;
+                        max-width: self.preferred-width;
+                    }
+                    for badge in tag.badges: Badge {
+                        text: badge;
+                        y: (parent.height - self.height) / 2;
+                    }
+                    Rectangle { horizontal-stretch: 1; }
+                }
+                Label {
+                    text: tag.size;
+                    width: 120px;
+                    Tooltip { text: @markdown("\{tag.size}"); }
+                }
+                Label { text: tag.context; width: 70px; }
+                Label { text: tag.input; width: 140px; secondary: true; }
+                TagAction {
+                    width: 100px;
+                    data: tag;
+                }
+            }
+        }
+    }
+}
+
+component LibraryDetailPane inherits VerticalLayout {
+    VerticalLayout {
+        padding: 20px;
+        padding-bottom: 12px;
+        spacing: 8px;
+        HorizontalLayout {
+            spacing: 8px;
+            Text {
+                text: Api.library-detail.name;
+                font-size: Theme.font-size + 7px;
+                font-weight: 700;
+                color: Theme.text;
+                horizontal-stretch: 1;
+                overflow: elide;
+            }
+            Button {
+                text: "ollama.com";
+                icon: Icons.external;
+                colorize-icon: true;
+                clicked => { Api.open-url(Api.library-detail.url); }
+            }
+        }
+        if Api.library-detail.summary != "": Text {
+            text: Api.library-detail.summary;
+            color: Theme.text-secondary;
+            font-size: Theme.font-size;
+            wrap: word-wrap;
+        }
+        if Api.library-detail.stats != "": Label {
+            text: Api.library-detail.stats;
+            small: true;
+            secondary: true;
+        }
+        HorizontalLayout {
+            spacing: 4px;
+            alignment: start;
+            for capability in Api.library-detail.capabilities: CapabilityBadge { capability: capability; }
+        }
+    }
+    Divider { }
+    HorizontalLayout {
+        padding-left: 20px;
+        padding-right: 24px;
+        padding-top: 10px;
+        padding-bottom: 6px;
+        Label {
+            text: @tr("Tags");
+            strong: true;
+            horizontal-stretch: 1;
+        }
+        SearchField {
+            width: 200px;
+            placeholder: @tr("Filter tags");
+            text <=> Api.tag-filter;
+            edited => { Api.tag-filter-changed(); }
+        }
+    }
+    Rectangle {
+        vertical-stretch: 1;
+        if Api.tags-loading && Api.tags.length == 0: HorizontalLayout {
+            alignment: center;
+            Spinner {
+                width: 24px;
+                height: 24px;
+                indeterminate: true;
+                y: (parent.height - self.height) / 2;
+            }
+        }
+        if Api.tags-error != "" && Api.tags.length == 0: EmptyState {
+            icon: Icons.tag;
+            title: @tr("Can't Load Tags");
+            message: Api.tags-error;
+            HorizontalLayout {
+                alignment: center;
+                Button {
+                    text: @tr("Try Again");
+                    clicked => { Api.reload-tags(); }
+                }
+            }
+        }
+        if Api.tags.length > 0: TagsTable { }
+    }
+}
+
+export component DiscoverPage inherits VerticalLayout {
+    Toolbar {
+        title: @tr("Discover");
+        subtitle: "ollama.com";
+        MenuButton {
+            icon: Icons.filter;
+            label: LibraryFilters.title(Api.library-filter);
+            y: (parent.height - self.height) / 2;
+            for filter in [0, 1, 2, 3, 4, 5]: MenuEntry {
+                text: LibraryFilters.title(filter);
+                checked: Api.library-filter == filter;
+                activated => {
+                    Api.library-filter = filter;
+                    Api.library-search();
+                }
+            }
+        }
+        MenuButton {
+            label: Api.library-sort == 0 ? @tr("Popular") : @tr("Newest");
+            y: (parent.height - self.height) / 2;
+            MenuEntry {
+                text: @tr("Popular");
+                checked: Api.library-sort == 0;
+                activated => {
+                    Api.library-sort = 0;
+                    Api.library-search();
+                }
+            }
+            MenuEntry {
+                text: @tr("Newest");
+                checked: Api.library-sort == 1;
+                activated => {
+                    Api.library-sort = 1;
+                    Api.library-search();
+                }
+            }
+        }
+        SearchField {
+            width: 260px;
+            y: (parent.height - self.height) / 2;
+            placeholder: @tr("Search models on ollama.com");
+            text <=> Api.library-query;
+            edited => { Api.library-search(); }
+        }
+    }
+    Divider { }
+    HorizontalLayout {
+        vertical-stretch: 1;
+        Rectangle {
+            width: 380px;
+            if Api.library-error != "": EmptyState {
+                icon: Icons.offline;
+                title: @tr("Can't Reach ollama.com");
+                message: Api.library-error;
+                HorizontalLayout {
+                    alignment: center;
+                    Button {
+                        text: @tr("Try Again");
+                        clicked => { Api.library-search(); }
+                    }
+                }
+            }
+            if Api.library-error == "" && Api.library-results.length == 0 && Api.library-loading: HorizontalLayout {
+                alignment: center;
+                Spinner {
+                    width: 24px;
+                    height: 24px;
+                    indeterminate: true;
+                    y: (parent.height - self.height) / 2;
+                }
+            }
+            if Api.library-error == "" && Api.library-results.length == 0 && !Api.library-loading: EmptyState {
+                icon: Icons.search;
+                title: @tr("No Results");
+            }
+            if Api.library-results.length > 0: ListView {
+                for row in Api.library-results: VerticalLayout {
+                    padding-left: 8px;
+                    padding-right: 8px;
+                    padding-top: 2px;
+                    padding-bottom: 2px;
+                    ResultRow {
+                        data: row;
+                    }
+                }
+            }
+        }
+        VDivider { }
+        Rectangle {
+            horizontal-stretch: 1;
+            if Api.has-library-detail: LibraryDetailPane { }
+            if !Api.has-library-detail: EmptyState {
+                icon: Icons.discover;
+                title: @tr("Discover Models");
+                message: @tr("Browse the Ollama library and pull models in one click.");
+            }
+        }
+    }
+}

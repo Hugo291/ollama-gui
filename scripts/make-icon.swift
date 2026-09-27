@@ -3,7 +3,10 @@
 import AppKit
 
 let size = 1024
-let output = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "icon_1024.png"
+let arguments = CommandLine.arguments.dropFirst()
+let output = arguments.first { !$0.hasPrefix("--") } ?? "icon_1024.png"
+/// Windows icons fill more of the canvas and use a plain rounded square.
+let windowsStyle = arguments.contains("--windows")
 
 guard let rep = NSBitmapImageRep(
     bitmapDataPlanes: nil, pixelsWide: size, pixelsHigh: size,
@@ -57,12 +60,16 @@ func layer(center: CGPoint, halfWidth w: CGFloat, halfHeight h: CGFloat, radius:
     return path
 }
 
-// Background tile, on the standard 824 pt grid with a soft shadow.
-let tileRect = CGRect(x: 100, y: 100, width: 824, height: 824)
-let tile = squircle(in: tileRect)
+// Background tile: the macOS 824 pt grid with a soft shadow, or a larger rounded square for Windows.
+let tileRect = windowsStyle ? CGRect(x: 40, y: 40, width: 944, height: 944) : CGRect(x: 100, y: 100, width: 824, height: 824)
+let tile = windowsStyle
+    ? CGPath(roundedRect: tileRect, cornerWidth: 190, cornerHeight: 190, transform: nil)
+    : squircle(in: tileRect)
 
 context.saveGState()
-context.setShadow(offset: CGSize(width: 0, height: -10), blur: 24, color: color(0x000000, 0.35))
+if !windowsStyle {
+    context.setShadow(offset: CGSize(width: 0, height: -10), blur: 24, color: color(0x000000, 0.35))
+}
 context.addPath(tile)
 context.setFillColor(color(0x4B3BE0))
 context.fillPath()

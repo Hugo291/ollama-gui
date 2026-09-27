@@ -1,0 +1,52 @@
+import { Palette } from "std-widgets.slint";
+import { Theme } from "theme.slint";
+import { Icons } from "icons.slint";
+import { Api } from "api.slint";
+import { Sidebar } from "sidebar.slint";
+import { ModelsPage } from "models.slint";
+import { RunningPage } from "running.slint";
+import { DownloadsPage } from "downloads.slint";
+import { DiscoverPage } from "discover.slint";
+import { PlaygroundPage } from "playground.slint";
+import { SettingsPage } from "settings.slint";
+import { Dialogs, Toast } from "dialogs.slint";
+import { VDivider } from "components.slint";
+import { Tray, TrayModel } from "tray.slint";
+
+export { Theme, Api, Palette, Tray, TrayModel }
+
+export component AppWindow inherits Window {
+    title: "Ollama GUI";
+    icon: @image-url("../assets/icon.png");
+    preferred-width: 1320px;
+    preferred-height: 820px;
+    min-width: 900px;
+    min-height: 560px;
+    background: Theme.window;
+    default-font-size: Theme.font-size;
+
+    HorizontalLayout {
+        Sidebar {
+            width: 232px;
+        }
+        VDivider { }
+        Rectangle {
+            horizontal-stretch: 1;
+            if Api.section == 0: ModelsPage { }
+            if Api.section == 1: RunningPage { }
+            if Api.section == 2: DownloadsPage { }
+            if Api.section == 3: DiscoverPage { }
+            if Api.section == 4: PlaygroundPage { }
+            if Api.section == 5: SettingsPage { }
+        }
+    }
+    if Api.dialog != 0: Dialogs {
+        width: parent.width;
+        height: parent.height;
+    }
+    if Api.toast-visible: Toast {
+        x: (parent.width - self.width) / 2;
+        y: parent.height - self.height - 20px;
+        width: min(560px, parent.width - 40px);
+    }
+}

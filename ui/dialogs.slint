@@ -1,0 +1,344 @@
+import { Button, ComboBox, LineEdit, Switch, Slider, Spinner, TextEdit } from "std-widgets.slint";
+import { Theme } from "theme.slint";
+import { Icons } from "icons.slint";
+import { Api } from "api.slint";
+import { Icon, Label } from "components.slint";
+
+// In-window modal sheet with a dimmed backdrop.
+component Sheet inherits Rectangle {
+    in property <string> title;
+    in property <length> sheet-width: 480px;
+    background: Theme.overlay;
+    TouchArea {
+        // Swallow clicks behind the sheet.
+    }
+    card := Rectangle {
+        width: root.sheet-width;
+        height: content.preferred-height;
+        y: max(40px, (root.height - self.height) / 3);
+        background: Theme.card;
+        border-radius: Theme.radius + 4px;
+        border-width: 1px;
+        border-color: Theme.card-stroke;
+        drop-shadow-blur: 30px;
+        drop-shadow-color: #00000055;
+        drop-shadow-offset-y: 8px;
+        content := VerticalLayout {
+            padding: 20px;
+            spacing: 12px;
+            Text {
+                text: root.title;
+                font-size: Theme.font-size + 5px;
+                font-weight: 700;
+                color: Theme.text;
+                wrap: word-wrap;
+            }
+            @children
+        }
+    }
+}
+
+component Paragraph inherits Text {
+    color: Theme.text-secondary;
+    font-size: Theme.font-size;
+    wrap: word-wrap;
+}
+
+component Status inherits Text {
+    in property <int> level;
+    color: level == 2 ? Theme.red : level == 1 ? Theme.orange : Theme.text-secondary;
+    font-size: Theme.small-font-size;
+    wrap: word-wrap;
+}
+
+component PullSheet inherits Sheet {
+    property <string> name;
+    property <int> status: Api.name-status(name, "");
+    title: @tr("Pull a Model");
+    Paragraph { text: @tr("Enter the name of a model from the Ollama library, optionally followed by a tag."); }
+    field := LineEdit {
+        text <=> root.name;
+        placeholder-text: "llama3.2:3b";
+        accepted => { root.submit(); }
+    }
+    Status {
+        level: root.status == 1 ? 1 : 0;
+        text: root.status == 1 ? @tr("This isn't a valid model name.")
+            : root.status == 3 ? @tr("Already installed: pulling it again updates it to the latest version.")
+            : @tr("Examples: gemma3, qwen3:8b, hf.co/unsloth/Qwen3-8B-GGUF:Q4_K_M");
+    }
+    HorizontalLayout {
+        spacing: 8px;
+        Button {
+            text: @tr("Browse the Library…");
+            clicked => {
+                Api.dialog = 0;
+                Api.section = 3;
+            }
+        }
+        Rectangle { horizontal-stretch: 1; }
+        Button {
+            text: @tr("Cancel");
+            clicked => { Api.dialog = 0; }
+        }
+        Button {
+            text: @tr("Pull");
+            primary: true;
+            enabled: (root.status == 2 || root.status == 3) && Api.connection == 1;
+            clicked => { root.submit(); }
+        }
+    }
+    init => { field.focus(); }
+
+    function submit() {
+        if (root.status == 2 || root.status == 3) && Api.connection == 1 {
+            Api.pull(root.name);
+        }
+    }
+}
+
+component CopySheet inherits Sheet {
+    in property <bool> rename;
+    property <string> name: Api.dialog-suggestion;
+    property <int> status: Api.name-status(name, Api.dialog-target);
+    title: rename ? @tr("Rename Model") : @tr("Duplicate Model");
+    Paragraph {
+        text: rename
+            ? @tr("Ollama has no rename: the model is copied under the new name, then the original name is removed. No data is downloaded again.")
+            : @tr("The copy shares its data with the original, so it takes no extra disk space. Useful to give a model a shorter name.");
+    }
+    HorizontalLayout {
+        spacing: 8px;
+        Label { text: @tr("Model"); secondary: true; width: 90px; }
+        Text {
+            text: Api.dialog-target;
+            font-family: Theme.is-macos ? "Menlo" : "Consolas";
+            color: Theme.text;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+    }
+    HorizontalLayout {
+        spacing: 8px;
+        Label { text: @tr("New name"); secondary: true; width: 90px; }
+        field := LineEdit {
+            text <=> root.name;
+            accepted => { root.submit(); }
+        }
+    }
+    if root.status == 1 || root.status == 3 || root.status == 4: Status {
+        level: 1;
+        text: root.status == 1 ? @tr("This isn't a valid model name.")
+            : root.status == 4 ? @tr("Choose a different name.")
+            : @tr("A model with this name already exists and will be replaced.");
+    }
+    if Api.dialog-error != "": Status { level: 2; text: Api.dialog-error; }
+    HorizontalLayout {
+        spacing: 8px;
+        if Api.dialog-busy: Spinner {
+            width: 16px;
+            height: 16px;
+            indeterminate: true;
+            y: (parent.height - self.height) / 2;
+        }
+        Rectangle { horizontal-stretch: 1; }
+        Button {
+            text: @tr("Cancel");
+            clicked => { Api.dialog = 0; }
+        }
+        Button {
+            text: root.rename ? @tr("Rename") : @tr("Duplicate");
+            primary: true;
+            enabled: !Api.dialog-busy && (root.status == 2 || root.status == 3);
+            clicked => { root.submit(); }
+        }
+    }
+    init => { field.focus(); }
+
+    function submit() {
+        if !Api.dialog-busy && (root.status == 2 || root.status == 3) {
+            Api.copy-model(Api.dialog-target, root.name, root.rename);
+        }
+    }
+}
+
+component ToggleRow inherits HorizontalLayout {
+    in property <string> text;
+    in-out property <bool> checked;
+    Label { text: root.text; horizontal-stretch: 1; }
+    Switch { checked <=> root.checked; }
+}
+
+component CustomizeSheet inherits Sheet {
+    property <string> base: Api.dialog-target;
+    property <string> name: Api.dialog-suggestion;
+    property <int> status: Api.name-status(name, base);
+    property <bool> use-temperature;
+    property <float> temperature: 0.7;
+    property <bool> use-context;
+    property <int> context-index: 2;
+    property <bool> use-top-p;
+    property <float> top-p: 0.9;
+    property <bool> use-seed;
+    property <string> seed: "42";
+    title: @tr("Customize a Model");
+    sheet-width: 560px;
+    Paragraph { text: @tr("Creates a new model on top of an existing one, with its own system prompt and parameters. The weights are shared, so it takes almost no disk space."); }
+    HorizontalLayout {
+        spacing: 8px;
+        Label { text: @tr("Based on"); secondary: true; width: 100px; }
+        ComboBox {
+            model: Api.base-models;
+            current-value <=> root.base;
+            selected(value) => { Api.customize-base-changed(value); }
+        }
+    }
+    HorizontalLayout {
+        spacing: 8px;
+        Label { text: @tr("Name"); secondary: true; width: 100px; }
+        LineEdit { text <=> root.name; }
+    }
+    if root.status == 1 || root.status == 4: Status {
+        level: 1;
+        text: root.status == 1 ? @tr("This isn't a valid model name.") : @tr("Choose a different name.");
+    }
+    Label { text: @tr("System Prompt"); secondary: true; }
+    system := TextEdit {
+        height: 110px;
+        text: Api.customize-system;
+        wrap: word-wrap;
+    }
+    Label { text: @tr("Parameters"); strong: true; }
+    ToggleRow { text: @tr("Temperature"); checked <=> root.use-temperature; }
+    if root.use-temperature: HorizontalLayout {
+        spacing: 8px;
+        Slider {
+            minimum: 0;
+            maximum: 2;
+            value <=> root.temperature;
+        }
+        Label { width: 40px; text: round(root.temperature * 100) / 100; horizontal-alignment: right; }
+    }
+    ToggleRow { text: @tr("Context window"); checked <=> root.use-context; }
+    if root.use-context: ComboBox {
+        model: ["2K", "4K", "8K", "16K", "32K", "64K", "128K", "256K"];
+        current-index <=> root.context-index;
+    }
+    ToggleRow { text: @tr("Top P"); checked <=> root.use-top-p; }
+    if root.use-top-p: HorizontalLayout {
+        spacing: 8px;
+        Slider {
+            minimum: 0;
+            maximum: 1;
+            value <=> root.top-p;
+        }
+        Label { width: 40px; text: round(root.top-p * 100) / 100; horizontal-alignment: right; }
+    }
+    ToggleRow { text: @tr("Fixed seed"); checked <=> root.use-seed; }
+    if root.use-seed: LineEdit {
+        text <=> root.seed;
+        input-type: number;
+        width: 160px;
+    }
+    if Api.dialog-status != "": Status { text: Api.dialog-status; }
+    if Api.dialog-error != "": Status { level: 2; text: Api.dialog-error; }
+    HorizontalLayout {
+        spacing: 8px;
+        if Api.dialog-busy: Spinner {
+            width: 16px;
+            height: 16px;
+            indeterminate: true;
+            y: (parent.height - self.height) / 2;
+        }
+        Rectangle { horizontal-stretch: 1; }
+        Button {
+            text: @tr("Cancel");
+            clicked => { Api.dialog = 0; }
+        }
+        Button {
+            text: @tr("Create");
+            primary: true;
+            enabled: !Api.dialog-busy && root.base != "" && (root.status == 2 || root.status == 3);
+            clicked => {
+                Api.create-model(
+                    root.base,
+                    root.name,
+                    system.text,
+                    root.use-temperature ? round(root.temperature * 100) / 100 : -1,
+                    root.use-context ? pow(2, root.context-index + 11) : -1,
+                    root.use-top-p ? round(root.top-p * 100) / 100 : -1,
+                    root.use-seed && root.seed.is-float() ? root.seed.to-float() : -1);
+            }
+        }
+    }
+}
+
+component DeleteSheet inherits Sheet {
+    title: @tr("Delete “{}”?", Api.dialog-target);
+    Paragraph { text: Api.dialog-message; }
+    HorizontalLayout {
+        spacing: 8px;
+        Rectangle { horizontal-stretch: 1; }
+        Button {
+            text: @tr("Cancel");
+            clicked => { Api.dialog = 0; }
+        }
+        Button {
+            text: @tr("Delete");
+            primary: true;
+            clicked => {
+                Api.delete-model(Api.dialog-target);
+                Api.dialog = 0;
+            }
+        }
+    }
+}
+
+// Error banner shown at the bottom of the window.
+export component Toast inherits Rectangle {
+    background: Theme.card;
+    border-radius: Theme.radius + 2px;
+    border-width: 1px;
+    border-color: Theme.red.with-alpha(0.5);
+    drop-shadow-blur: 16px;
+    drop-shadow-color: #00000040;
+    drop-shadow-offset-y: 4px;
+    height: row.preferred-height;
+    row := HorizontalLayout {
+        padding: 12px;
+        spacing: 10px;
+        Icon {
+            icon: Icons.warning;
+            tint: Theme.red;
+            size: 18px;
+        }
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 2px;
+            Label { text: Api.toast-title; strong: true; }
+            Text {
+                text: Api.toast-message;
+                color: Theme.text-secondary;
+                font-size: Theme.small-font-size;
+                wrap: word-wrap;
+            }
+        }
+        TouchArea {
+            width: 18px;
+            clicked => { Api.dismiss-toast(); }
+            Icon {
+                icon: Icons.close;
+                size: 14px;
+                tint: Theme.text-secondary;
+            }
+        }
+    }
+}
+
+export component Dialogs inherits Rectangle {
+    if Api.dialog == 1: PullSheet { }
+    if Api.dialog == 2: CopySheet { rename: false; }
+    if Api.dialog == 3: CopySheet { rename: true; }
+    if Api.dialog == 4: CustomizeSheet { }
+    if Api.dialog == 5: DeleteSheet { }
+}

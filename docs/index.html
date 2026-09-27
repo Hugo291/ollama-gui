@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ollama GUI</title>
+  <meta name="description" content="A desktop app for macOS and Windows to manage your Ollama models: pull, update, inspect, load, customize and chat.">
+  <meta property="og:title" content="Ollama GUI">
+  <meta property="og:description" content="Manage your Ollama models on macOS and Windows, without the terminal.">
+  <meta property="og:image" content="https://hugo291.github.io/ollama-gui/screenshots/models.png">
+  <meta property="og:type" content="website">
+  <link rel="icon" type="image/png" href="icon.png">
+  <style>
+    :root {
+      --bg: #ffffff;
+      --bg-alt: #f5f5f7;
+      --card: #ffffff;
+      --text: #1d1d1f;
+      --text-2: #6e6e73;
+      --stroke: #e3e3e6;
+      --accent: #007aff;
+      --accent-text: #ffffff;
+      --shadow: 0 18px 50px rgba(0, 0, 0, 0.14);
+      color-scheme: light dark;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #111113;
+        --bg-alt: #1b1b1e;
+        --card: #1f1f22;
+        --text: #f5f5f7;
+        --text-2: #a1a1a6;
+        --stroke: #333338;
+        --accent: #0a84ff;
+        --shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+      }
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 17px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    img { max-width: 100%; display: block; }
+    code { font: 0.88em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--bg-alt); border: 1px solid var(--stroke); border-radius: 6px; padding: 1px 6px; }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+
+    /* Language: only the content of the chosen language is shown. */
+    html[lang="en"] [lang="fr"], html[lang="fr"] [lang="en"] { display: none !important; }
+
+    header.top { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; color: var(--text); }
+    .brand img { width: 28px; height: 28px; }
+    .top nav { display: flex; align-items: center; gap: 18px; font-size: 15px; }
+    .lang-switch { border: 1px solid var(--stroke); background: var(--card); color: var(--text); border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 14px; cursor: pointer; }
+
+    .hero { text-align: center; padding: 48px 0 36px; }
+    .hero .icon { width: 112px; height: 112px; margin: 0 auto 18px; }
+    .hero h1 { font-size: clamp(38px, 6vw, 60px); line-height: 1.05; margin: 0 0 14px; letter-spacing: -0.02em; }
+    .hero p.tagline { font-size: clamp(18px, 2.4vw, 22px); color: var(--text-2); max-width: 720px; margin: 0 auto 28px; }
+    .downloads { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+    .button { display: inline-flex; align-items: center; gap: 10px; padding: 12px 22px; border-radius: 12px; border: 1px solid var(--stroke); background: var(--card); color: var(--text); font-weight: 600; font-size: 16px; }
+    .button:hover { text-decoration: none; border-color: var(--accent); }
+    .button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+    .button svg { width: 18px; height: 18px; flex: none; }
+    .button small { font-weight: 400; opacity: 0.8; }
+    .hero .meta { margin-top: 14px; font-size: 14px; color: var(--text-2); }
+
+    .shot { margin: 34px auto 0; border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); border: 1px solid var(--stroke); }
+
+    section { padding: 64px 0; }
+    section.alt { background: var(--bg-alt); }
+    h2 { font-size: clamp(28px, 4vw, 38px); margin: 0 0 10px; letter-spacing: -0.01em; text-align: center; }
+    .lead { color: var(--text-2); text-align: center; max-width: 680px; margin: 0 auto 36px; }
+
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .card { background: var(--card); border: 1px solid var(--stroke); border-radius: 14px; padding: 20px; }
+    .card h3 { margin: 10px 0 6px; font-size: 18px; }
+    .card p { margin: 0; color: var(--text-2); font-size: 15px; }
+    .card .glyph { width: 36px; height: 36px; border-radius: 9px; display: grid; place-items: center; color: #fff; }
+    .card .glyph svg { width: 20px; height: 20px; }
+
+    .gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 22px; }
+    figure { margin: 0; }
+    figure img { border-radius: 12px; border: 1px solid var(--stroke); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08); }
+    figcaption { text-align: center; color: var(--text-2); font-size: 14px; margin-top: 10px; }
+
+    .install { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+    .install ol { margin: 8px 0 0; padding-left: 20px; color: var(--text-2); font-size: 15px; }
+    .install li { margin-bottom: 6px; }
+
+    footer { padding: 36px 0 48px; color: var(--text-2); font-size: 14px; text-align: center; }
+    footer .slint { display: inline-block; margin-top: 14px; }
+    footer .slint img { height: 48px; }
+    .slint .dark-logo { display: none; }
+    @media (prefers-color-scheme: dark) {
+      .slint .light-logo { display: none; }
+      .slint .dark-logo { display: block; }
+    }
+
+    @media (max-width: 860px) {
+      .grid { grid-template-columns: repeat(2, 1fr); }
+      .gallery, .install { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 560px) {
+      .grid { grid-template-columns: 1fr; }
+      .top nav a.hide-small { display: none; }
+      .button { width: 100%; justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <a class="brand" href="#"><img src="icon.png" alt="">Ollama GUI</a>
+      <nav>
+        <a class="hide-small" href="#features"><span lang="en">Features</span><span lang="fr">Fonctions</span></a>
+        <a class="hide-small" href="#install"><span lang="en">Install</span><span lang="fr">Installation</span></a>
+        <a href="https://github.com/Hugo291/ollama-gui">GitHub</a>
+        <button class="lang-switch" type="button" id="lang-switch" aria-label="Language / Langue">FR</button>
+      </nav>
+    </header>
+  </div>
+
+  <main>
+    <div class="wrap hero">
+      <img class="icon" src="icon.png" alt="Ollama GUI icon" width="112" height="112">
+      <h1>Ollama GUI</h1>
+      <p class="tagline">
+        <span lang="en">Manage your Ollama models on macOS and Windows. Pull, update, inspect, load, customize and chat, without the terminal.</span>
+        <span lang="fr">Gérez vos modèles Ollama sur macOS et Windows. Téléchargez, mettez à jour, inspectez, chargez, personnalisez et discutez, sans le terminal.</span>
+      </p>
+      <div class="downloads">
+        <a class="button" id="dl-mac" href="https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-macOS.zip">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+          <span><span lang="en">Download for macOS</span><span lang="fr">Télécharger pour macOS</span></span>
+        </a>
+        <a class="button" id="dl-win" href="https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-Windows-Setup.exe">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+          <span><span lang="en">Download for Windows</span><span lang="fr">Télécharger pour Windows</span></span>
+        </a>
+      </div>
+      <p class="meta">
+        <span lang="en">Free and open source (MIT) · macOS 11+ (Apple silicon and Intel) · Windows 10 and 11 (64-bit) · <a href="https://github.com/Hugo291/ollama-gui/releases">All releases</a></span>
+        <span lang="fr">Gratuit et open source (MIT) · macOS 11+ (Apple silicon et Intel) · Windows 10 et 11 (64 bits) · <a href="https://github.com/Hugo291/ollama-gui/releases">Toutes les versions</a></span>
+      </p>
+      <img class="shot" src="screenshots/models.png" alt="The Models page: installed models with their size, parameters and capabilities, and the details of the selected model" width="1600" height="994">
+    </div>
+
+    <section id="features" class="alt">
+      <div class="wrap">
+        <h2><span lang="en">Everything about your models, in one place</span><span lang="fr">Tout sur vos modèles, au même endroit</span></h2>
+        <p class="lead">
+          <span lang="en">Ollama GUI talks to the Ollama REST API of this computer or of any server on your network.</span>
+          <span lang="fr">Ollama GUI utilise l'API REST d'Ollama sur cet ordinateur ou sur n'importe quel serveur de votre réseau.</span>
+        </p>
+        <div class="grid">
+          <div class="card">
+            <div class="glyph" style="background:#007aff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></svg></div>
+            <h3><span lang="en">Models</span><span lang="fr">Modèles</span></h3>
+            <p><span lang="en">Size, parameters, quantization and capabilities of every model, with its full configuration: parameters, system prompt, template, Modelfile, license and tensors.</span><span lang="fr">Taille, paramètres, quantification et capacités de chaque modèle, avec sa configuration complète : paramètres, prompt système, template, Modelfile, licence et tenseurs.</span></p>
+          </div>
+          <div class="card">
+            <div class="glyph" style="background:#34c759"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg></div>
+            <h3><span lang="en">Updates</span><span lang="fr">Mises à jour</span></h3>
+            <p><span lang="en">Finds outdated models by comparing digests with the Ollama registry, without downloading anything, and updates one or all of them in one click.</span><span lang="fr">Repère les modèles obsolètes en comparant les empreintes avec le registre Ollama, sans rien télécharger, et les met à jour en un clic.</span></p>
+          </div>
+          <div class="card">
+            <div class="glyph" style="background:#ff9500"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg></div>
+            <h3><span lang="en">Discover</span><span lang="fr">Découvrir</span></h3>
+            <p><span lang="en">Search the ollama.com library, filter by capability, browse every tag with its size and context window, and pull with live progress.</span><span lang="fr">Recherchez dans la bibliothèque ollama.com, filtrez par capacité, parcourez chaque tag avec sa taille et son contexte, et téléchargez avec la progression en direct.</span></p>
+          </div>
+          <div class="card">
+            <div class="glyph" style="background:#af52de"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/></svg></div>
+            <h3><span lang="en">Memory</span><span lang="fr">Mémoire</span></h3>
+            <p><span lang="en">Loaded models with memory, CPU/GPU split and a countdown to unload. Load, unload or keep a model loaded longer, never forever.</span><span lang="fr">Modèles chargés avec leur mémoire, la répartition CPU/GPU et un compte à rebours. Chargez, déchargez ou gardez un modèle plus longtemps, jamais indéfiniment.</span></p>
+          </div>
+          <div class="card">
+            <div class="glyph" style="background:#ff2d55"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.38 3.62a1 1 0 0 1 3 3L7.37 18.64a2 2 0 0 1-.85.5l-2.87.84a.5.5 0 0 1-.62-.62l.84-2.87a2 2 0 0 1 .5-.85z"/></svg></div>
+            <h3><span lang="en">Customize</span><span lang="fr">Personnaliser</span></h3>
+            <p><span lang="en">Create a model on top of another with its own system prompt, temperature, context window, top P and seed. Duplicate, rename and delete.</span><span lang="fr">Créez un modèle à partir d'un autre avec son prompt système, sa température, son contexte, son top P et sa graine. Dupliquez, renommez, supprimez.</span></p>
+          </div>
+          <div class="card">
+            <div class="glyph" style="background:#30b0c7"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/></svg></div>
+            <h3><span lang="en">Playground</span><span lang="fr">Bac à sable</span></h3>
+            <p><span lang="en">Chat with a model and see its speed in tokens per second. Markdown replies, reasoning for thinking models, images for vision models.</span><span lang="fr">Discutez avec un modèle et voyez sa vitesse en tokens par seconde. Réponses en Markdown, réflexion des modèles « thinking », images pour les modèles de vision.</span></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <h2><span lang="en">A closer look</span><span lang="fr">En images</span></h2>
+        <p class="lead">
+          <span lang="en">Native-looking on each platform, in light and dark mode, in English and French.</span>
+          <span lang="fr">Un rendu natif sur chaque plateforme, en mode clair et sombre, en français et en anglais.</span>
+        </p>
+        <div class="gallery">
+          <figure><img src="screenshots/running.png" alt="Models loaded in memory" loading="lazy" width="1600" height="994"><figcaption><span lang="en">Models in memory</span><span lang="fr">Modèles en mémoire</span></figcaption></figure>
+          <figure><img src="screenshots/discover.png" alt="The ollama.com library" loading="lazy" width="1600" height="994"><figcaption><span lang="en">The ollama.com library</span><span lang="fr">La bibliothèque ollama.com</span></figcaption></figure>
+          <figure><img src="screenshots/playground.png" alt="The Playground" loading="lazy" width="1600" height="994"><figcaption><span lang="en">Playground</span><span lang="fr">Bac à sable</span></figcaption></figure>
+          <figure><img src="screenshots/downloads.png" alt="A download in progress" loading="lazy" width="1600" height="994"><figcaption><span lang="en">Downloads</span><span lang="fr">Téléchargements</span></figcaption></figure>
+        </div>
+      </div>
+    </section>
+
+    <section id="install" class="alt">
+      <div class="wrap">
+        <h2><span lang="en">Install</span><span lang="fr">Installation</span></h2>
+        <p class="lead">
+          <span lang="en">First install and start <a href="https://ollama.com/download">Ollama</a>, on this computer or on a machine the app can reach.</span>
+          <span lang="fr">Installez et lancez d'abord <a href="https://ollama.com/download">Ollama</a>, sur cet ordinateur ou sur une machine accessible.</span>
+        </p>
+        <div class="install">
+          <div class="card">
+            <h3>macOS</h3>
+            <ol>
+              <li><span lang="en">Download <a href="https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-macOS.zip">OllamaGUI-macOS.zip</a>, unzip it and move Ollama GUI to Applications.</span><span lang="fr">Téléchargez <a href="https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-macOS.zip">OllamaGUI-macOS.zip</a>, dézippez et glissez Ollama GUI dans Applications.</span></li>
+              <li><span lang="en">The app is not notarized: the first time, right-click it and choose <b>Open</b>.</span><span lang="fr">L'app n'est pas notarisée : la première fois, clic droit puis <b>Ouvrir</b>.</span></li>
+            </ol>
+          </div>
+          <div class="card">
+            <h3>Windows</h3>
+            <ol>
+              <li><span lang="en">Run <a href="https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-Windows-Setup.exe">OllamaGUI-Windows-Setup.exe</a>. No administrator rights needed.</span><span lang="fr">Lancez <a href="https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-Windows-Setup.exe">OllamaGUI-Windows-Setup.exe</a>. Aucun droit administrateur requis.</span></li>
+              <li><span lang="en">The installer is not code-signed: if SmartScreen warns you, choose <b>More info → Run anyway</b>.</span><span lang="fr">L'installeur n'est pas signé : si SmartScreen s'affiche, choisissez <b>Informations complémentaires → Exécuter quand même</b>.</span></li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <div>
+        <span lang="en">MIT License · An independent project, not affiliated with Ollama · <a href="https://github.com/Hugo291/ollama-gui">Source code</a></span>
+        <span lang="fr">Licence MIT · Un projet indépendant, sans lien avec Ollama · <a href="https://github.com/Hugo291/ollama-gui">Code source</a></span>
+      </div>
+      <a class="slint" href="https://slint.dev" aria-label="Made with Slint">
+        <img class="light-logo" src="https://raw.githubusercontent.com/slint-ui/slint/master/logo/MadeWithSlint-logo-light.svg" alt="Made with Slint">
+        <img class="dark-logo" src="https://raw.githubusercontent.com/slint-ui/slint/master/logo/MadeWithSlint-logo-dark.svg" alt="Made with Slint">
+      </a>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      var root = document.documentElement;
+      var saved = null;
+      try { saved = localStorage.getItem("lang"); } catch (e) {}
+      var lang = saved || ((navigator.language || "en").toLowerCase().indexOf("fr") === 0 ? "fr" : "en");
+      var button = document.getElementById("lang-switch");
+      function apply(value) {
+        root.lang = value;
+        button.textContent = value === "fr" ? "EN" : "FR";
+      }
+      apply(lang);
+      button.addEventListener("click", function () {
+        var next = root.lang === "fr" ? "en" : "fr";
+        apply(next);
+        try { localStorage.setItem("lang", next); } catch (e) {}
+      });
+
+      // Highlight the download for the visitor's system.
+      var platform = ((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || navigator.userAgent || "").toLowerCase();
+      var id = platform.indexOf("win") !== -1 ? "dl-win" : platform.indexOf("mac") !== -1 ? "dl-mac" : null;
+      if (id) { document.getElementById(id).classList.add("primary"); }
+    })();
+  </script>
+</body>
+</html>

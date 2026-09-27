@@ -1,0 +1,2 @@
+"NSLocalNetworkUsageDescription" = "Ollama GUI se connecte aux serveurs Ollama que vous ajoutez sur votre réseau local.";
+"CFBundleDisplayName" = "Ollama GUI";

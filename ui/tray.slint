@@ -1,0 +1,89 @@
+import { Palette } from "std-widgets.slint";
+
+export struct TrayModel {
+    name: string,
+    label: string,
+    can-chat: bool,
+}
+
+// Menu bar extra on macOS, notification area icon on Windows.
+export component Tray inherits SystemTrayIcon {
+    // Monochrome glyph that follows the menu bar appearance (macOS), or the app icon.
+    in property <bool> monochrome;
+    in property <string> server;
+    in property <string> status;
+    in property <[TrayModel]> models;
+    in property <[string]> downloads;
+    callback open-window();
+    callback open-section(section: int);
+    callback chat(name: string);
+    callback unload(name: string);
+    callback unload-all();
+    callback quit();
+
+    icon: !root.monochrome ? @image-url("../assets/icon.png")
+        : Palette.color-scheme == ColorScheme.dark
+            ? (root.models.length > 0 ? @image-url("../assets/tray-light-active.svg") : @image-url("../assets/tray-light.svg"))
+            : (root.models.length > 0 ? @image-url("../assets/tray-dark-active.svg") : @image-url("../assets/tray-dark.svg"));
+    tooltip: "Ollama GUI";
+    // A left click on Windows opens the window; on macOS it opens the menu.
+    clicked => { root.open-window(); }
+
+    Menu {
+        MenuItem {
+            title: root.server;
+            enabled: false;
+        }
+        MenuItem {
+            title: root.status;
+            enabled: false;
+        }
+        MenuSeparator { }
+        if root.models.length == 0: MenuItem {
+            title: @tr("No models in memory");
+            enabled: false;
+        }
+        if root.models.length > 0: MenuItem {
+            title: @tr("In Memory");
+            enabled: false;
+        }
+        for model in root.models: Menu {
+            title: model.label;
+            if model.can-chat: MenuItem {
+                title: @tr("Chat");
+                activated => { root.chat(model.name); }
+            }
+            MenuItem {
+                title: @tr("Unload");
+                activated => { root.unload(model.name); }
+            }
+        }
+        if root.models.length > 1: MenuItem {
+            title: @tr("Unload All");
+            activated => { root.unload-all(); }
+        }
+        if root.downloads.length > 0: MenuSeparator { }
+        if root.downloads.length > 0: MenuItem {
+            title: @tr("Downloads");
+            enabled: false;
+        }
+        for download in root.downloads: MenuItem {
+            title: download;
+            activated => { root.open-section(2); }
+        }
+        MenuSeparator { }
+        MenuItem {
+            title: @tr("Open Ollama GUI");
+            activated => { root.open-window(); }
+        }
+        MenuItem {
+            title: @tr("Settings…");
+            activated => { root.open-section(5); }
+        }
+        MenuSeparator { }
+        MenuItem {
+            title: @tr("Quit Ollama GUI");
+            activated => { root.quit(); }
+        }
+    }
+}

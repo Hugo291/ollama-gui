@@ -1,0 +1,170 @@
+import { Button, ScrollView, ProgressIndicator, Spinner } from "std-widgets.slint";
+import { Theme } from "theme.slint";
+import { Icons } from "icons.slint";
+import { Api, RunningRow } from "api.slint";
+import { Icon, Label, ModelIcon, ToolButton, EmptyState, Card, Divider, Toolbar, MenuButton, MenuEntry } from "components.slint";
+
+component Metric inherits VerticalLayout {
+    in property <string> title;
+    in property <string> value;
+    spacing: 2px;
+    Text {
+        text: root.title;
+        font-size: Theme.small-font-size;
+        color: Theme.text-secondary;
+    }
+    Text {
+        text: root.value;
+        font-size: Theme.font-size;
+        font-weight: 600;
+        color: Theme.text;
+    }
+}
+
+// Drop-down listing the installed models that can be loaded into memory.
+export component LoadModelButton inherits MenuButton {
+    icon: Icons.play;
+    label: @tr("Load Model");
+    enabled: Api.connection == 1 && Api.loadable-models.length > 0;
+    for name in Api.loadable-models: MenuEntry {
+        text: name;
+        activated => { Api.load-model(name); }
+    }
+}
+
+component RunningCard inherits Card {
+    in property <RunningRow> data;
+    VerticalLayout {
+        padding: 14px;
+        spacing: 12px;
+        HorizontalLayout {
+            spacing: 12px;
+            ModelIcon {
+                kind: root.data.kind;
+                size: 34px;
+                y: (parent.height - self.height) / 2;
+            }
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+                Label {
+                    text: root.data.name;
+                    strong: true;
+                }
+                if root.data.detail != "": Label {
+                    text: root.data.detail;
+                    small: true;
+                    secondary: true;
+                }
+            }
+            if root.data.busy: Spinner {
+                width: 16px;
+                height: 16px;
+                indeterminate: true;
+                y: (parent.height - self.height) / 2;
+            }
+            MenuButton {
+                icon: Icons.history;
+                label: @tr("Keep Loaded");
+                enabled: root.data.can-load;
+                y: (parent.height - self.height) / 2;
+                for label[index] in Api.keep-alive-labels: MenuEntry {
+                    text: label;
+                    activated => { Api.keep-loaded(root.data.name, index); }
+                }
+            }
+            if root.data.can-chat: Button {
+                text: @tr("Chat");
+                icon: Icons.chat;
+                colorize-icon: true;
+                clicked => { Api.chat-with(root.data.name); }
+            }
+            Button {
+                text: @tr("Unload");
+                icon: Icons.stop;
+                colorize-icon: true;
+                enabled: !root.data.busy;
+                clicked => { Api.unload-model(root.data.name); }
+            }
+        }
+        HorizontalLayout {
+            spacing: 32px;
+            alignment: start;
+            Metric { title: @tr("Memory"); value: root.data.memory; }
+            Metric { title: @tr("Processor"); value: root.data.processor; }
+            if root.data.context != "": Metric { title: @tr("Context"); value: root.data.context; }
+            Metric { title: @tr("Unloads"); value: root.data.unloads; }
+        }
+        ProgressIndicator {
+            height: 6px;
+            progress: root.data.gpu-share;
+            Tooltip { text: @markdown("\{root.data.processor}"); }
+        }
+    }
+}
+
+export component RunningPage inherits VerticalLayout {
+    Toolbar {
+        title: @tr("Running");
+        subtitle: Api.running-subtitle;
+        LoadModelButton {
+            y: (parent.height - self.height) / 2;
+        }
+        ToolButton {
+            icon: Icons.stop;
+            tooltip: @tr("Unload every model from memory");
+            enabled: Api.running.length > 0;
+            y: (parent.height - self.height) / 2;
+            clicked => { Api.unload-all(); }
+        }
+    }
+    Divider { }
+    Rectangle {
+        vertical-stretch: 1;
+        if Api.connection != 1: EmptyState {
+            icon: Api.connection == 2 ? Icons.offline : Icons.server;
+            title: Api.connection == 2 ? @tr("Ollama Is Not Reachable") : @tr("Connecting…");
+            message: Api.connection == 2 ? Api.connection-error : Api.server-url;
+        }
+        if Api.connection == 1 && Api.running.length == 0: EmptyState {
+            icon: Icons.running;
+            title: @tr("No Models in Memory");
+            message: @tr("Models load automatically when they are used, and unload when their keep-alive expires.");
+            HorizontalLayout {
+                alignment: center;
+                LoadModelButton { }
+            }
+        }
+        if Api.connection == 1 && Api.running.length > 0: ScrollView {
+            VerticalLayout {
+                padding: 20px;
+                spacing: 12px;
+                alignment: start;
+                if Api.show-memory-gauge: Card {
+                    VerticalLayout {
+                        padding: 14px;
+                        spacing: 8px;
+                        HorizontalLayout {
+                            Label {
+                                text: @tr("Memory used by models");
+                                strong: true;
+                                horizontal-stretch: 1;
+                            }
+                            Label {
+                                text: Api.memory-text;
+                                secondary: true;
+                            }
+                        }
+                        ProgressIndicator {
+                            height: 6px;
+                            progress: Api.memory-share;
+                        }
+                    }
+                }
+                for row in Api.running: RunningCard {
+                    data: row;
+                }
+            }
+        }
+    }
+}

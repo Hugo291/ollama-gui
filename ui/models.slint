@@ -1,0 +1,552 @@
+import { Button, ScrollView, ListView, Spinner, ProgressIndicator } from "std-widgets.slint";
+import { Theme } from "theme.slint";
+import { Icons } from "icons.slint";
+import { Api, ModelRow } from "api.slint";
+import {
+    Icon, Label, ModelIcon, Badge, CapabilityBadge, CapabilityIcons, StatusDot, ToolButton, SearchField,
+    EmptyState, CodeDisclosure, Divider, VDivider, Toolbar, MenuButton, MenuEntry
+} from "components.slint";
+
+export global ModelFilters {
+    public pure function title(filter: int) -> string {
+        if filter == 1 { return @tr("Local"); }
+        if filter == 2 { return @tr("Cloud"); }
+        if filter == 3 { return @tr("Vision"); }
+        if filter == 4 { return @tr("Tools"); }
+        if filter == 5 { return @tr("Thinking"); }
+        if filter == 6 { return @tr("Embedding"); }
+        if filter == 7 { return @tr("Image"); }
+        return @tr("All Models");
+    }
+}
+
+component HeaderCell inherits Rectangle {
+    in property <string> title;
+    in property <int> column: -1;
+    property <bool> sorted: column >= 0 && Api.sort-column == column;
+    background: touch.has-hover && column >= 0 ? Theme.hover : transparent;
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 4px;
+        spacing: 4px;
+        Text {
+            text: root.title;
+            font-size: Theme.small-font-size;
+            font-weight: 600;
+            color: Theme.text-secondary;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        if root.sorted: Icon {
+            icon: Api.sort-ascending ? Icons.chevron-up : Icons.chevron-down;
+            size: 11px;
+            tint: Theme.text-secondary;
+            y: (parent.height - self.height) / 2;
+        }
+    }
+    touch := TouchArea {
+        enabled: root.column >= 0;
+        clicked => {
+            if Api.sort-column == root.column {
+                Api.sort-ascending = !Api.sort-ascending;
+            } else {
+                Api.sort-column = root.column;
+                Api.sort-ascending = root.column == 0;
+            }
+            Api.models-query-changed();
+        }
+    }
+}
+
+component Cell inherits Rectangle {
+    in property <string> text;
+    in property <bool> secondary;
+    Text {
+        x: 8px;
+        width: parent.width - 16px;
+        text: root.text;
+        color: root.secondary ? Theme.text-secondary : Theme.text;
+        font-size: Theme.font-size;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+}
+
+component ModelTableRow inherits Rectangle {
+    in property <ModelRow> data;
+    in property <int> index;
+    in property <bool> compact;
+    property <bool> selected: Api.selected-model == data.name;
+    callback clicked();
+    height: 32px;
+    background: selected ? Theme.selection : touch.has-hover ? Theme.hover : Math.mod(index, 2) == 1 ? Theme.zebra : transparent;
+    ContextMenuArea {
+        Menu {
+            MenuItem {
+                title: @tr("Chat");
+                enabled: root.data.can-chat;
+                activated => { Api.chat-with(root.data.name); }
+            }
+            if root.data.running: MenuItem {
+                title: @tr("Unload from Memory");
+                activated => { Api.unload-model(root.data.name); }
+            }
+            if !root.data.running: MenuItem {
+                title: @tr("Load into Memory");
+                enabled: root.data.can-load;
+                activated => { Api.load-model(root.data.name); }
+            }
+            MenuSeparator { }
+            MenuItem {
+                title: @tr("Update");
+                activated => { Api.update-model(root.data.name); }
+            }
+            MenuItem {
+                title: @tr("Duplicate…");
+                activated => { Api.open-dialog(2, root.data.name); }
+            }
+            MenuItem {
+                title: @tr("Rename…");
+                activated => { Api.open-dialog(3, root.data.name); }
+            }
+            MenuItem {
+                title: @tr("Customize…");
+                enabled: root.data.can-customize;
+                activated => { Api.open-dialog(4, root.data.name); }
+            }
+            MenuSeparator { }
+            MenuItem {
+                title: @tr("Copy Name");
+                activated => { Api.copy-name(root.data.name); }
+            }
+            MenuItem {
+                title: @tr("Open Model Page");
+                enabled: root.data.has-page;
+                activated => { Api.open-page(root.data.name); }
+            }
+            MenuSeparator { }
+            MenuItem {
+                title: @tr("Delete…");
+                activated => { Api.open-dialog(5, root.data.name); }
+            }
+        }
+        touch := TouchArea {
+            clicked => { root.clicked(); }
+            pointer-event(event) => {
+                // Select on right-click too, before the context menu opens.
+                if event.button == PointerEventButton.right && event.kind == PointerEventKind.down {
+                    root.clicked();
+                }
+            }
+        }
+    }
+    HorizontalLayout {
+        padding-left: 12px;
+        Rectangle {
+            horizontal-stretch: 1;
+            min-width: 160px;
+            HorizontalLayout {
+                spacing: 8px;
+                ModelIcon {
+                    kind: root.data.kind;
+                    size: 20px;
+                    y: (parent.height - self.height) / 2;
+                }
+                Text {
+                    text: root.data.name;
+                    color: Theme.text;
+                    font-size: Theme.font-size;
+                    vertical-alignment: center;
+                    overflow: elide;
+                    horizontal-stretch: 1;
+                    max-width: self.preferred-width;
+                }
+                if root.data.running: StatusDot {
+                    dot-color: Theme.green;
+                    width: 7px;
+                    height: 7px;
+                    y: (parent.height - self.height) / 2;
+                    Tooltip { text: @markdown("\{@tr("Loaded in memory")}"); }
+                }
+                if root.data.downloading: Spinner {
+                    width: 14px;
+                    height: 14px;
+                    y: (parent.height - self.height) / 2;
+                    indeterminate: root.data.progress < 0;
+                    progress: max(root.data.progress, 0);
+                }
+                if !root.data.downloading && root.data.update == 2: Icon {
+                    icon: Icons.downloads;
+                    tint: Theme.accent;
+                    size: 14px;
+                    y: (parent.height - self.height) / 2;
+                    Tooltip { text: @markdown("\{@tr("Update available")}"); }
+                }
+                if !root.data.downloading && root.data.update == 1: Spinner {
+                    width: 12px;
+                    height: 12px;
+                    indeterminate: true;
+                    y: (parent.height - self.height) / 2;
+                }
+                Rectangle { horizontal-stretch: 0.001; }
+            }
+        }
+        Cell { width: 92px; text: root.data.parameters; }
+        if !root.compact: Cell { width: 112px; text: root.data.quantization; }
+        Cell { width: 90px; text: root.data.size; secondary: root.data.is-cloud; }
+        Rectangle {
+            width: 118px;
+            CapabilityIcons {
+                x: 8px;
+                capabilities: root.data.capabilities;
+            }
+        }
+        if !root.compact: Cell {
+            width: 112px;
+            text: root.data.modified;
+            secondary: true;
+            Tooltip { text: @markdown("\{root.data.modified-long}"); }
+        }
+    }
+}
+
+component ModelTable inherits Rectangle {
+    property <bool> compact: self.width < 640px;
+    border-radius: Theme.radius;
+    border-width: 1px;
+    border-color: Theme.card-stroke;
+    background: Theme.card;
+    clip: true;
+    forward-focus: keys;
+    keys := FocusScope {
+        key-pressed(event) => {
+            if event.text == Key.Delete || (event.text == Key.Backspace && event.modifiers.meta) {
+                if Api.selected-model != "" {
+                    Api.open-dialog(5, Api.selected-model);
+                    return accept;
+                }
+            }
+            if event.text == Key.UpArrow || event.text == Key.DownArrow {
+                Api.move-selection(event.text == Key.UpArrow ? -1 : 1);
+                return accept;
+            }
+            reject
+        }
+        VerticalLayout {
+            Rectangle {
+                height: 30px;
+                HorizontalLayout {
+                    padding-left: 40px;
+                    HeaderCell { title: @tr("Name"); column: 0; horizontal-stretch: 1; min-width: 132px; }
+                    HeaderCell { title: @tr("Parameters"); column: 1; width: 92px; }
+                    if !root.compact: HeaderCell { title: @tr("Quantization"); column: 2; width: 112px; }
+                    HeaderCell { title: @tr("Size"); column: 3; width: 90px; }
+                    HeaderCell { title: @tr("Capabilities"); width: 118px; }
+                    if !root.compact: HeaderCell { title: @tr("Modified"); column: 4; width: 112px; }
+                }
+            }
+            Divider { }
+            ListView {
+                for row[index] in Api.models: ModelTableRow {
+                    data: row;
+                    index: index;
+                    compact: root.compact;
+                    clicked => {
+                        keys.focus();
+                        Api.select-model(row.name);
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Right-hand pane with the details of the selected model.
+component DetailsPane inherits Rectangle {
+    background: Theme.window;
+    ScrollView {
+        VerticalLayout {
+            padding: 16px;
+            spacing: 12px;
+            alignment: start;
+            HorizontalLayout {
+                spacing: 12px;
+                ModelIcon {
+                    kind: Api.detail.kind;
+                    size: 44px;
+                }
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 2px;
+                    Text {
+                        text: Api.detail.name;
+                        font-size: Theme.font-size + 4px;
+                        font-weight: 600;
+                        color: Theme.text;
+                        wrap: word-wrap;
+                    }
+                    if Api.detail.summary != "": Label {
+                        text: Api.detail.summary;
+                        secondary: true;
+                    }
+                }
+            }
+            HorizontalLayout {
+                spacing: 4px;
+                alignment: start;
+                if Api.detail.is-cloud: Badge { text: @tr("Cloud"); tint: Theme.capability-color("cloud"); }
+                if Api.detail.running: Badge { text: @tr("In Memory"); tint: Theme.green; }
+                if Api.detail.update == 2: Badge { text: @tr("Update Available"); tint: Theme.accent; }
+                if Api.detail.update == 3: Badge { text: @tr("Up to Date"); }
+                for capability in Api.detail.capabilities: CapabilityBadge { capability: capability; }
+            }
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: start;
+                Button {
+                    text: @tr("Chat");
+                    icon: Icons.chat;
+                    colorize-icon: true;
+                    enabled: Api.detail.can-chat;
+                    clicked => { Api.chat-with(Api.detail.name); }
+                }
+                if Api.detail.running: Button {
+                    text: @tr("Unload");
+                    icon: Icons.stop;
+                    colorize-icon: true;
+                    enabled: !Api.detail.busy;
+                    clicked => { Api.unload-model(Api.detail.name); }
+                }
+                if !Api.detail.running && Api.detail.can-load: Button {
+                    text: @tr("Load");
+                    icon: Icons.play;
+                    colorize-icon: true;
+                    enabled: !Api.detail.busy;
+                    clicked => { Api.load-model(Api.detail.name); }
+                    Tooltip { text: @markdown("\{Api.detail.load-tooltip}"); }
+                }
+                if Api.detail.downloading: ProgressIndicator {
+                    width: 70px;
+                    height: 6px;
+                    y: (parent.height - self.height) / 2;
+                    indeterminate: Api.detail.progress < 0;
+                    progress: max(Api.detail.progress, 0);
+                }
+                if !Api.detail.downloading && Api.detail.update == 2: Button {
+                    text: @tr("Update");
+                    icon: Icons.downloads;
+                    colorize-icon: true;
+                    primary: true;
+                    clicked => { Api.update-model(Api.detail.name); }
+                }
+                if Api.detail.busy: Spinner {
+                    width: 16px;
+                    height: 16px;
+                    indeterminate: true;
+                    y: (parent.height - self.height) / 2;
+                }
+                MenuButton {
+                    icon: Icons.more;
+                    label: @tr("More");
+                    MenuEntry {
+                        text: @tr("Update");
+                        activated => { Api.update-model(Api.detail.name); }
+                    }
+                    MenuEntry {
+                        text: @tr("Duplicate…");
+                        activated => { Api.open-dialog(2, Api.detail.name); }
+                    }
+                    MenuEntry {
+                        text: @tr("Rename…");
+                        activated => { Api.open-dialog(3, Api.detail.name); }
+                    }
+                    MenuEntry {
+                        text: @tr("Customize…");
+                        enabled: Api.detail.can-customize;
+                        activated => { Api.open-dialog(4, Api.detail.name); }
+                    }
+                    MenuEntry {
+                        text: @tr("Copy Name");
+                        activated => { Api.copy-name(Api.detail.name); }
+                    }
+                    MenuEntry {
+                        text: @tr("Open Model Page");
+                        enabled: Api.detail.has-page;
+                        activated => { Api.open-page(Api.detail.name); }
+                    }
+                    MenuEntry {
+                        text: @tr("Delete…");
+                        text-color: Theme.red;
+                        activated => { Api.open-dialog(5, Api.detail.name); }
+                    }
+                }
+            }
+            Divider { }
+            for fact in Api.detail.facts: HorizontalLayout {
+                spacing: 12px;
+                Text {
+                    width: 118px;
+                    text: fact.title;
+                    color: Theme.text-secondary;
+                    font-size: Theme.font-size;
+                    overflow: elide;
+                }
+                Text {
+                    text: fact.value;
+                    color: Theme.text;
+                    font-size: Theme.font-size;
+                    font-family: fact.mono ? (Theme.is-macos ? "Menlo" : "Consolas") : "";
+                    wrap: word-wrap;
+                    horizontal-stretch: 1;
+                }
+            }
+            if Api.detail.digest != "": HorizontalLayout {
+                spacing: 12px;
+                Text {
+                    width: 118px;
+                    text: @tr("Digest");
+                    color: Theme.text-secondary;
+                    font-size: Theme.font-size;
+                    vertical-alignment: center;
+                }
+                Text {
+                    text: Api.detail.short-digest;
+                    color: Theme.text;
+                    font-size: Theme.font-size;
+                    font-family: Theme.is-macos ? "Menlo" : "Consolas";
+                    vertical-alignment: center;
+                }
+                ToolButton {
+                    icon: Icons.copy;
+                    icon-size: 13px;
+                    tooltip: @tr("Copy");
+                    clicked => { Api.copy-text(Api.detail.digest); }
+                }
+                Rectangle { horizontal-stretch: 1; }
+            }
+            if Api.detail.loading: HorizontalLayout {
+                alignment: center;
+                Spinner {
+                    width: 20px;
+                    height: 20px;
+                    indeterminate: true;
+                }
+            }
+            if Api.detail.error != "": Label {
+                text: Api.detail.error;
+                secondary: true;
+                wrap: word-wrap;
+            }
+            for section in Api.detail.sections: CodeDisclosure {
+                title: section.title;
+                text: section.text;
+                expanded: section.expanded;
+            }
+        }
+    }
+}
+
+export component ModelsPage inherits VerticalLayout {
+    in-out property <bool> show-inspector: true;
+    Toolbar {
+        title: @tr("Models");
+        subtitle: Api.models-subtitle;
+        MenuButton {
+            icon: Icons.filter;
+            label: ModelFilters.title(Api.model-filter);
+            y: (parent.height - self.height) / 2;
+            for filter in [0, 1, 2, 3, 4, 5, 6, 7]: MenuEntry {
+                text: ModelFilters.title(filter);
+                checked: Api.model-filter == filter;
+                activated => {
+                    Api.model-filter = filter;
+                    Api.models-query-changed();
+                }
+            }
+        }
+        if Api.update-count > 0: ToolButton {
+            icon: Icons.downloads;
+            tooltip: @tr("Update all outdated models");
+            y: (parent.height - self.height) / 2;
+            clicked => { Api.update-all(); }
+        }
+        ToolButton {
+            icon: Icons.sync;
+            tooltip: @tr("Check the Ollama registry for newer versions of your models");
+            enabled: Api.connection == 1 && !Api.checking-updates;
+            y: (parent.height - self.height) / 2;
+            clicked => { Api.check-updates(); }
+        }
+        ToolButton {
+            icon: Icons.plus;
+            tooltip: @tr("Pull a model from the Ollama library");
+            enabled: Api.connection == 1;
+            y: (parent.height - self.height) / 2;
+            clicked => { Api.open-dialog(1, ""); }
+        }
+        ToolButton {
+            icon: Icons.info;
+            tooltip: @tr("Show or hide model details");
+            active: root.show-inspector;
+            y: (parent.height - self.height) / 2;
+            clicked => { root.show-inspector = !root.show-inspector; }
+        }
+        SearchField {
+            width: 220px;
+            y: (parent.height - self.height) / 2;
+            placeholder: @tr("Filter models");
+            text <=> Api.model-search;
+            edited => { Api.models-query-changed(); }
+        }
+    }
+    Divider { }
+    HorizontalLayout {
+        vertical-stretch: 1;
+        Rectangle {
+            horizontal-stretch: 1;
+            if Api.connection != 1 && Api.models-count == 0: EmptyState {
+                icon: Api.connection == 2 ? Icons.offline : Icons.server;
+                title: Api.connection == 2 ? @tr("Ollama Is Not Reachable") : @tr("Connecting…");
+                message: Api.connection == 2 ? Api.connection-error : Api.server-url;
+            }
+            if Api.connection == 1 && Api.models-loaded && Api.models-count == 0: EmptyState {
+                icon: Icons.models;
+                title: @tr("No Models Yet");
+                message: @tr("Pull a model from the Ollama library to get started.");
+                HorizontalLayout {
+                    alignment: center;
+                    spacing: 8px;
+                    Button {
+                        text: @tr("Pull a Model…");
+                        primary: true;
+                        clicked => { Api.open-dialog(1, ""); }
+                    }
+                    Button {
+                        text: @tr("Discover Models");
+                        clicked => { Api.section = 3; }
+                    }
+                }
+            }
+            if Api.models-count > 0 && Api.models.length == 0: EmptyState {
+                icon: Icons.search;
+                title: @tr("No Results");
+            }
+            if Api.models.length > 0: ModelTable {
+                x: 12px;
+                y: 12px;
+                width: parent.width - 24px;
+                height: parent.height - 24px;
+            }
+        }
+        if root.show-inspector: VDivider { }
+        if root.show-inspector: Rectangle {
+            width: 360px;
+            if Api.has-detail: DetailsPane { }
+            if !Api.has-detail: EmptyState {
+                icon: Icons.info;
+                title: @tr("No Selection");
+                message: @tr("Select a model to see its details.");
+            }
+        }
+    }
+}

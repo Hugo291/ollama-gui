@@ -1,0 +1,73 @@
+// Lucide icons (ISC license, see icons/LICENSE-lucide.txt), tinted with `colorize`.
+export global Icons {
+    out property <image> models: @image-url("icons/layers.svg");
+    out property <image> running: @image-url("icons/cpu.svg");
+    out property <image> downloads: @image-url("icons/circle-arrow-down.svg");
+    out property <image> discover: @image-url("icons/globe.svg");
+    out property <image> playground: @image-url("icons/messages-square.svg");
+    out property <image> settings: @image-url("icons/settings.svg");
+    out property <image> plus: @image-url("icons/plus.svg");
+    out property <image> refresh: @image-url("icons/refresh-cw.svg");
+    out property <image> sync: @image-url("icons/refresh-ccw.svg");
+    out property <image> trash: @image-url("icons/trash-2.svg");
+    out property <image> copy: @image-url("icons/copy.svg");
+    out property <image> pencil: @image-url("icons/pencil.svg");
+    out property <image> sliders: @image-url("icons/sliders-horizontal.svg");
+    out property <image> play: @image-url("icons/play.svg");
+    out property <image> stop: @image-url("icons/circle-stop.svg");
+    out property <image> cloud: @image-url("icons/cloud.svg");
+    out property <image> eye: @image-url("icons/eye.svg");
+    out property <image> wrench: @image-url("icons/wrench.svg");
+    out property <image> brain: @image-url("icons/brain.svg");
+    out property <image> waypoints: @image-url("icons/waypoints.svg");
+    out property <image> image: @image-url("icons/image.svg");
+    out property <image> audio: @image-url("icons/audio-lines.svg");
+    out property <image> text: @image-url("icons/message-square-text.svg");
+    out property <image> chat: @image-url("icons/message-square.svg");
+    out property <image> search: @image-url("icons/search.svg");
+    out property <image> filter: @image-url("icons/list-filter.svg");
+    out property <image> more: @image-url("icons/ellipsis.svg");
+    out property <image> server: @image-url("icons/server.svg");
+    out property <image> info: @image-url("icons/info.svg");
+    out property <image> check-circle: @image-url("icons/circle-check.svg");
+    out property <image> x-circle: @image-url("icons/circle-x.svg");
+    out property <image> close: @image-url("icons/x.svg");
+    out property <image> history: @image-url("icons/history.svg");
+    out property <image> send: @image-url("icons/arrow-up.svg");
+    out property <image> attach: @image-url("icons/paperclip.svg");
+    out property <image> external: @image-url("icons/external-link.svg");
+    out property <image> chevron-down: @image-url("icons/chevron-down.svg");
+    out property <image> chevron-up: @image-url("icons/chevron-up.svg");
+    out property <image> chevron-right: @image-url("icons/chevron-right.svg");
+    out property <image> warning: @image-url("icons/triangle-alert.svg");
+    out property <image> offline: @image-url("icons/wifi-off.svg");
+    out property <image> compose: @image-url("icons/square-pen.svg");
+    out property <image> retry: @image-url("icons/rotate-cw.svg");
+    out property <image> hash: @image-url("icons/hash.svg");
+    out property <image> timer: @image-url("icons/timer.svg");
+    out property <image> gauge: @image-url("icons/gauge.svg");
+    out property <image> check: @image-url("icons/check.svg");
+    out property <image> tag: @image-url("icons/tag.svg");
+    out property <image> download: @image-url("icons/download.svg");
+
+    public pure function capability(name: string) -> image {
+        if name == "vision" { return eye; }
+        if name == "tools" { return wrench; }
+        if name == "thinking" { return brain; }
+        if name == "embedding" { return waypoints; }
+        if name == "image" { return image; }
+        if name == "audio" { return audio; }
+        if name == "cloud" { return cloud; }
+        if name == "completion" { return text; }
+        return tag;
+    }
+
+    // Kinds of models: text, vision, embedding, image, cloud.
+    public pure function kind(kind: int) -> image {
+        if kind == 1 { return eye; }
+        if kind == 2 { return waypoints; }
+        if kind == 3 { return image; }
+        if kind == 4 { return cloud; }
+        return text;
+    }
+}

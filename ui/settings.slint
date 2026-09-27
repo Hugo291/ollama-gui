@@ -1,0 +1,268 @@
+import { Button, ComboBox, LineEdit, ScrollView, Switch, Spinner, AboutSlint } from "std-widgets.slint";
+import { Theme } from "theme.slint";
+import { Icons } from "icons.slint";
+import { Api, ServerItem } from "api.slint";
+import { Icon, Label, Badge, ToolButton, Card, Divider, Toolbar } from "components.slint";
+
+component SettingRow inherits Card {
+    in property <string> title;
+    in property <string> subtitle;
+    HorizontalLayout {
+        padding: 14px;
+        spacing: 16px;
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            spacing: 2px;
+            Label { text: root.title; }
+            if root.subtitle != "": Text {
+                text: root.subtitle;
+                font-size: Theme.small-font-size;
+                color: Theme.text-secondary;
+                wrap: word-wrap;
+            }
+        }
+        @children
+    }
+}
+
+component ServerCard inherits Card {
+    in property <ServerItem> server;
+    in property <bool> removable;
+    property <bool> editing;
+    // The address whose test result is shown: results of other cards or addresses stay hidden.
+    property <string> tested-address;
+    property <string> edit-name;
+    property <string> edit-address;
+    VerticalLayout {
+        padding: 14px;
+        spacing: 10px;
+        HorizontalLayout {
+            spacing: 12px;
+            Icon {
+                icon: Icons.server;
+                size: 18px;
+                tint: root.server.current ? Theme.green : Theme.text-secondary;
+                y: (parent.height - self.height) / 2;
+            }
+            VerticalLayout {
+                horizontal-stretch: 1;
+                alignment: center;
+                HorizontalLayout {
+                    spacing: 8px;
+                    Label {
+                        text: root.server.name;
+                        strong: true;
+                        max-width: self.preferred-width;
+                    }
+                    if root.server.current: Badge {
+                        text: @tr("Current Server");
+                        tint: Theme.green;
+                        y: (parent.height - self.height) / 2;
+                    }
+                    Rectangle { horizontal-stretch: 1; }
+                }
+                Label {
+                    text: root.server.url;
+                    small: true;
+                    secondary: true;
+                }
+            }
+            if root.server.current: Button {
+                text: @tr("Reconnect");
+                clicked => { Api.retry(); }
+            }
+            if !root.server.current: Button {
+                text: @tr("Use This Server");
+                clicked => { Api.select-server(root.server.id); }
+            }
+            ToolButton {
+                icon: Icons.pencil;
+                tooltip: @tr("Edit");
+                y: (parent.height - self.height) / 2;
+                clicked => {
+                    root.edit-name = root.server.name;
+                    root.edit-address = root.server.address;
+                    root.tested-address = "";
+                    root.editing = !root.editing;
+                }
+            }
+            ToolButton {
+                icon: Icons.trash;
+                tooltip: @tr("Remove");
+                enabled: root.removable;
+                y: (parent.height - self.height) / 2;
+                clicked => { Api.remove-server(root.server.id); }
+            }
+        }
+        if root.editing: VerticalLayout {
+            spacing: 8px;
+            HorizontalLayout {
+                spacing: 10px;
+                VerticalLayout {
+                    spacing: 4px;
+                    Label { text: @tr("Name"); small: true; secondary: true; }
+                    LineEdit { text <=> root.edit-name; }
+                }
+                VerticalLayout {
+                    horizontal-stretch: 2;
+                    spacing: 4px;
+                    Label { text: @tr("Address"); small: true; secondary: true; }
+                    LineEdit {
+                        text <=> root.edit-address;
+                        placeholder-text: "http://127.0.0.1:11434";
+                    }
+                }
+            }
+            Label {
+                text: Api.address-preview(root.edit-address);
+                small: true;
+                secondary: true;
+            }
+            HorizontalLayout {
+                spacing: 8px;
+                Button {
+                    text: @tr("Test Connection");
+                    enabled: !Api.testing;
+                    clicked => {
+                        root.tested-address = root.edit-address;
+                        Api.test-server(root.edit-address);
+                    }
+                }
+                if Api.testing && root.tested-address == root.edit-address: Spinner {
+                    width: 16px;
+                    height: 16px;
+                    indeterminate: true;
+                    y: (parent.height - self.height) / 2;
+                }
+                if !Api.testing && Api.test-result != "" && root.tested-address == root.edit-address: Text {
+                    text: Api.test-result;
+                    color: Api.test-ok ? Theme.green : Theme.red;
+                    font-size: Theme.small-font-size;
+                    vertical-alignment: center;
+                    overflow: elide;
+                    horizontal-stretch: 1;
+                }
+                Rectangle { horizontal-stretch: 1; }
+                Button {
+                    text: @tr("Cancel");
+                    clicked => { root.editing = false; }
+                }
+                Button {
+                    text: @tr("Save");
+                    primary: true;
+                    clicked => {
+                        Api.save-server(root.server.id, root.edit-name, root.edit-address);
+                        root.editing = false;
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component SettingsPage inherits VerticalLayout {
+    Toolbar {
+        title: @tr("Settings");
+    }
+    Divider { }
+    ScrollView {
+        vertical-stretch: 1;
+        VerticalLayout {
+            padding: 24px;
+            spacing: 8px;
+            alignment: start;
+            Label { text: @tr("Servers"); strong: true; }
+            for server in Api.server-list: ServerCard {
+                server: server;
+                removable: Api.server-list.length > 1;
+            }
+            HorizontalLayout {
+                alignment: start;
+                Button {
+                    text: @tr("Add Server");
+                    icon: Icons.plus;
+                    colorize-icon: true;
+                    clicked => { Api.add-server(); }
+                }
+            }
+            Rectangle { height: 12px; }
+            Label { text: @tr("General"); strong: true; }
+            SettingRow {
+                title: @tr("Keep models loaded for");
+                subtitle: @tr("Applies when you load a model or chat in the Playground. Models are never kept in memory indefinitely.");
+                ComboBox {
+                    width: 150px;
+                    model: Api.keep-alive-labels;
+                    current-index <=> Api.keep-alive-index;
+                    selected => { Api.settings-changed(); }
+                }
+            }
+            SettingRow {
+                title: @tr("Refresh status every");
+                ComboBox {
+                    width: 150px;
+                    model: Api.refresh-labels;
+                    current-index <=> Api.refresh-index;
+                    selected => { Api.settings-changed(); }
+                }
+            }
+            SettingRow {
+                title: @tr("Check for model updates at launch");
+                Switch {
+                    checked <=> Api.check-updates-at-launch;
+                    toggled => { Api.settings-changed(); }
+                }
+            }
+            SettingRow {
+                title: Theme.is-macos ? @tr("Show in menu bar") : @tr("Show in notification area");
+                Switch {
+                    checked <=> Api.show-tray-icon;
+                    toggled => { Api.settings-changed(); }
+                }
+            }
+            SettingRow {
+                title: @tr("Appearance");
+                ComboBox {
+                    width: 150px;
+                    model: [@tr("System"), @tr("Light"), @tr("Dark")];
+                    current-index <=> Api.theme-index;
+                    selected => { Api.settings-changed(); }
+                }
+            }
+            Rectangle { height: 12px; }
+            Label { text: @tr("About"); strong: true; }
+            Card {
+                HorizontalLayout {
+                    padding: 14px;
+                    spacing: 12px;
+                    Image {
+                        source: @image-url("../assets/icon.png");
+                        width: 36px;
+                        height: 36px;
+                    }
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        alignment: center;
+                        Label { text: "Ollama GUI " + Api.app-version; strong: true; }
+                        Text {
+                            text: @tr("An independent open-source project, not affiliated with Ollama.");
+                            color: Theme.text-secondary;
+                            font-size: Theme.small-font-size;
+                            wrap: word-wrap;
+                        }
+                    }
+                    Button {
+                        text: @tr("Source Code");
+                        icon: Icons.external;
+                        colorize-icon: true;
+                        clicked => { Api.open-url("https://github.com/Hugo291/ollama-gui"); }
+                    }
+                }
+            }
+            AboutSlint {
+                height: 110px;
+            }
+        }
+    }
+}

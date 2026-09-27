@@ -1,0 +1,303 @@
+// Data and actions shared between the Rust controller and the interface.
+
+export struct ModelRow {
+    name: string,
+    // 0 text, 1 vision, 2 embedding, 3 image, 4 cloud
+    kind: int,
+    parameters: string,
+    quantization: string,
+    size: string,
+    is-cloud: bool,
+    capabilities: [string],
+    modified: string,
+    modified-long: string,
+    running: bool,
+    // 0 unknown, 1 checking, 2 available, 3 up to date
+    update: int,
+    downloading: bool,
+    // 0..1, or -1 while unknown
+    progress: float,
+    can-chat: bool,
+    can-load: bool,
+    can-customize: bool,
+    has-page: bool,
+}
+
+export struct Fact {
+    title: string,
+    value: string,
+    mono: bool,
+}
+
+export struct DetailSection {
+    title: string,
+    text: string,
+    expanded: bool,
+}
+
+export struct ModelDetail {
+    name: string,
+    kind: int,
+    summary: string,
+    is-cloud: bool,
+    running: bool,
+    update: int,
+    busy: bool,
+    downloading: bool,
+    progress: float,
+    capabilities: [string],
+    can-chat: bool,
+    can-load: bool,
+    can-customize: bool,
+    has-page: bool,
+    facts: [Fact],
+    digest: string,
+    short-digest: string,
+    sections: [DetailSection],
+    loading: bool,
+    error: string,
+    load-tooltip: string,
+}
+
+export struct RunningRow {
+    name: string,
+    detail: string,
+    kind: int,
+    memory: string,
+    processor: string,
+    context: string,
+    gpu-share: float,
+    unloads: string,
+    can-chat: bool,
+    can-load: bool,
+    busy: bool,
+}
+
+export struct DownloadRow {
+    id: int,
+    name: string,
+    server: string,
+    // 0 running, 1 completed, 2 failed, 3 cancelled
+    state: int,
+    detail: string,
+    percent: string,
+    // 0..1, or -1 while unknown
+    progress: float,
+    can-reveal: bool,
+}
+
+export struct LibraryRow {
+    path: string,
+    name: string,
+    summary: string,
+    capabilities: [string],
+    sizes: [string],
+    pulls: string,
+    installed: bool,
+}
+
+export struct LibraryDetail {
+    name: string,
+    summary: string,
+    stats: string,
+    capabilities: [string],
+    url: string,
+}
+
+export struct TagRow {
+    name: string,
+    tag: string,
+    badges: [string],
+    size: string,
+    context: string,
+    input: string,
+    // 0 can pull, 1 downloading, 2 installed
+    state: int,
+    progress: float,
+}
+
+export struct ChatPart {
+    // 0 styled text, 1 code or table
+    kind: int,
+    styled: styled-text,
+    text: string,
+    language: string,
+}
+
+export struct ChatRow {
+    is-user: bool,
+    text: string,
+    parts: [ChatPart],
+    thinking: string,
+    model: string,
+    streaming: bool,
+    error: string,
+    stats: string,
+    images: [image],
+}
+
+export struct ServerItem {
+    id: string,
+    name: string,
+    address: string,
+    url: string,
+    current: bool,
+}
+
+export global Api {
+    // Navigation: 0 models, 1 running, 2 downloads, 3 discover, 4 playground, 5 settings.
+    in-out property <int> section: 0;
+
+    // Connection: 0 connecting, 1 connected, 2 unreachable.
+    in property <int> connection: 0;
+    in property <string> connection-text;
+    in property <string> connection-error;
+    in property <string> server-name;
+    in property <string> server-url;
+    in property <[ServerItem]> servers;
+    in property <bool> can-start-ollama;
+    callback select-server(id: string);
+    callback retry();
+    callback start-ollama();
+
+    // Models
+    in property <[ModelRow]> models;
+    in property <int> models-count;
+    in property <string> models-subtitle;
+    in property <bool> models-loaded;
+    in property <int> update-count;
+    in property <bool> checking-updates;
+    in-out property <string> selected-model;
+    in property <bool> has-detail;
+    in property <ModelDetail> detail;
+    in-out property <string> model-search;
+    // 0 all, 1 local, 2 cloud, 3 vision, 4 tools, 5 thinking, 6 embedding, 7 image
+    in-out property <int> model-filter;
+    // 0 name, 1 parameters, 2 quantization, 3 size, 4 modified
+    in-out property <int> sort-column;
+    in-out property <bool> sort-ascending: true;
+    callback models-query-changed();
+    callback select-model(name: string);
+    callback move-selection(delta: int);
+    callback refresh();
+    callback check-updates();
+    callback update-all();
+    callback load-model(name: string);
+    callback unload-model(name: string);
+    callback update-model(name: string);
+    callback chat-with(name: string);
+    callback copy-name(name: string);
+    callback copy-text(text: string);
+    callback open-page(name: string);
+    callback open-url(url: string);
+
+    // Dialogs: 0 none, 1 pull, 2 duplicate, 3 rename, 4 customize, 5 delete.
+    in-out property <int> dialog;
+    in-out property <string> dialog-target;
+    in property <bool> dialog-busy;
+    in property <string> dialog-error;
+    in property <string> dialog-status;
+    in property <string> dialog-message;
+    in property <string> dialog-suggestion;
+    // 0 empty, 1 invalid, 2 new, 3 already installed, 4 same as the source
+    pure callback name-status(name: string, source: string) -> int;
+    callback open-dialog(kind: int, target: string);
+    callback pull(name: string);
+    callback copy-model(source: string, destination: string, rename: bool);
+    callback delete-model(name: string);
+    in property <[string]> base-models;
+    in property <string> customize-system;
+    callback customize-base-changed(base: string);
+    // -1 leaves a parameter to the base model.
+    callback create-model(base: string, name: string, system: string, temperature: float, num-ctx: int, top-p: float, seed: int);
+
+    // Toast for errors.
+    in property <bool> toast-visible;
+    in property <string> toast-title;
+    in property <string> toast-message;
+    callback dismiss-toast();
+
+    // Running models
+    in property <[RunningRow]> running;
+    in property <string> running-subtitle;
+    in property <string> memory-text;
+    in property <float> memory-share;
+    in property <bool> show-memory-gauge;
+    in property <[string]> loadable-models;
+    in property <[string]> keep-alive-labels;
+    callback keep-loaded(name: string, choice: int);
+    callback unload-all();
+
+    // Downloads
+    in property <[DownloadRow]> downloads;
+    in property <int> active-downloads;
+    in property <bool> has-finished-downloads;
+    callback cancel-download(id: int);
+    callback retry-download(id: int);
+    callback remove-download(id: int);
+    callback reveal-download(id: int);
+    callback clear-finished();
+
+    // Discover
+    in-out property <string> library-query;
+    // 0 all, 1 vision, 2 tools, 3 thinking, 4 embedding, 5 cloud
+    in-out property <int> library-filter;
+    // 0 popular, 1 newest
+    in-out property <int> library-sort;
+    callback library-search();
+    in property <[LibraryRow]> library-results;
+    in property <bool> library-loading;
+    in property <string> library-error;
+    in-out property <string> library-selected;
+    callback select-library(path: string);
+    in property <bool> has-library-detail;
+    in property <LibraryDetail> library-detail;
+    in property <[TagRow]> tags;
+    in property <bool> tags-loading;
+    in property <string> tags-error;
+    in-out property <string> tag-filter;
+    callback tag-filter-changed();
+    callback reload-tags();
+
+    // Playground
+    in property <[ChatRow]> messages;
+    in-out property <string> chat-model;
+    in property <[string]> chat-models;
+    in property <bool> generating;
+    in property <string> chat-hint;
+    in property <bool> chat-vision;
+    in property <bool> chat-thinking-supported;
+    in-out property <string> system-prompt;
+    in-out property <bool> custom-temperature;
+    in-out property <float> temperature: 0.7;
+    in-out property <int> context-index;
+    in property <[string]> context-labels;
+    in-out property <bool> thinking-enabled: true;
+    in property <[image]> attachments;
+    callback send-message(text: string);
+    callback stop-generating();
+    callback new-conversation();
+    callback attach-images();
+    callback remove-attachment(index: int);
+    callback chat-model-changed();
+
+    // Settings
+    in property <[ServerItem]> server-list;
+    callback add-server();
+    callback remove-server(id: string);
+    callback save-server(id: string, name: string, address: string);
+    pure callback address-preview(address: string) -> string;
+    callback test-server(address: string);
+    in property <bool> testing;
+    in property <bool> test-ok;
+    in property <string> test-result;
+    in-out property <int> keep-alive-index;
+    in-out property <int> refresh-index;
+    in property <[string]> refresh-labels;
+    in-out property <bool> check-updates-at-launch;
+    // 0 system, 1 light, 2 dark
+    in-out property <int> theme-index;
+    in-out property <bool> show-tray-icon: true;
+    callback settings-changed();
+    in property <string> app-version;
+}

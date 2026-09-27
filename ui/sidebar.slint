@@ -1,0 +1,131 @@
+import { Theme } from "theme.slint";
+import { Icons } from "icons.slint";
+import { Api, ServerItem } from "api.slint";
+import { Icon, Label, StatusDot, MenuButton, MenuEntry } from "components.slint";
+import { Button } from "std-widgets.slint";
+
+component SidebarItem inherits Rectangle {
+    in property <image> icon;
+    in property <string> title;
+    in property <int> index;
+    in property <int> badge;
+    property <bool> selected: Api.section == index;
+    height: Theme.is-macos ? 30px : 36px;
+    border-radius: Theme.control-radius;
+    background: selected ? Theme.sidebar-selection : touch.has-hover ? Theme.hover : transparent;
+    // Windows marks the selected item with an accent bar.
+    if !Theme.is-macos && root.selected: Rectangle {
+        x: 0;
+        width: 3px;
+        height: 16px;
+        border-radius: 1.5px;
+        background: Theme.accent;
+    }
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 8px;
+        spacing: 9px;
+        Icon {
+            icon: root.icon;
+            size: 17px;
+            tint: root.selected && Theme.is-macos ? Theme.accent : Theme.text;
+            y: (parent.height - self.height) / 2;
+        }
+        Label {
+            text: root.title;
+            strong: root.selected;
+            horizontal-stretch: 1;
+        }
+        if root.badge > 0: Text {
+            text: root.badge;
+            font-size: Theme.small-font-size;
+            color: Theme.text-secondary;
+            vertical-alignment: center;
+        }
+    }
+    touch := TouchArea {
+        clicked => { Api.section = root.index; }
+    }
+}
+
+component SectionTitle inherits Text {
+    font-size: Theme.small-font-size;
+    font-weight: 600;
+    color: Theme.text-tertiary;
+    height: 26px;
+    vertical-alignment: bottom;
+}
+
+// Connection status and server switcher at the bottom of the sidebar.
+component ServerStatus inherits Rectangle {
+    border-radius: Theme.radius + 2px;
+    background: Theme.dark ? #ffffff0a : #0000000a;
+    VerticalLayout {
+        padding: 10px;
+        spacing: 8px;
+        HorizontalLayout {
+            spacing: 8px;
+            StatusDot {
+                dot-color: Api.connection == 1 ? Theme.green : Api.connection == 2 ? Theme.red : Theme.orange;
+                y: (parent.height - self.height) / 2;
+            }
+            Label {
+                text: Api.connection-text;
+                small: true;
+                secondary: true;
+                Tooltip { text: @markdown("\{Api.connection == 2 ? Api.connection-error : Api.server-url}"); }
+            }
+        }
+        MenuButton {
+            icon: Icons.server;
+            label: Api.server-name;
+            for server in Api.servers: MenuEntry {
+                text: server.name;
+                checked: server.current;
+                activated => { Api.select-server(server.id); }
+            }
+            Rectangle {
+                height: 1px;
+                background: Theme.divider;
+            }
+            MenuEntry {
+                text: @tr("Manage Servers…");
+                activated => { Api.section = 5; }
+            }
+        }
+        if Api.connection == 2: HorizontalLayout {
+            spacing: 6px;
+            if Api.can-start-ollama: Button {
+                text: @tr("Start Ollama");
+                primary: true;
+                clicked => { Api.start-ollama(); }
+            }
+            Button {
+                text: @tr("Retry");
+                clicked => { Api.retry(); }
+            }
+        }
+    }
+}
+
+export component Sidebar inherits Rectangle {
+    background: Theme.sidebar;
+    VerticalLayout {
+        padding-top: Theme.titlebar-inset;
+        padding-left: 10px;
+        padding-right: 10px;
+        padding-bottom: 10px;
+        spacing: 2px;
+        SectionTitle { text: @tr("Library"); }
+        SidebarItem { icon: Icons.models; title: @tr("Models"); index: 0; badge: Api.models-count; }
+        SidebarItem { icon: Icons.running; title: @tr("Running"); index: 1; badge: Api.running.length; }
+        SidebarItem { icon: Icons.downloads; title: @tr("Downloads"); index: 2; badge: Api.active-downloads; }
+        SectionTitle { text: @tr("Explore"); }
+        SidebarItem { icon: Icons.discover; title: @tr("Discover"); index: 3; }
+        SidebarItem { icon: Icons.playground; title: @tr("Playground"); index: 4; }
+        Rectangle { vertical-stretch: 1; }
+        SidebarItem { icon: Icons.settings; title: @tr("Settings"); index: 5; }
+        Rectangle { height: 6px; }
+        ServerStatus { }
+    }
+}

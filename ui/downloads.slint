@@ -1,0 +1,129 @@
+import { Button, ScrollView, ProgressIndicator } from "std-widgets.slint";
+import { Theme } from "theme.slint";
+import { Icons } from "icons.slint";
+import { Api, DownloadRow } from "api.slint";
+import { Icon, Label, ToolButton, EmptyState, Card, Divider, Toolbar } from "components.slint";
+
+component DownloadCard inherits Card {
+    in property <DownloadRow> data;
+    HorizontalLayout {
+        padding: 14px;
+        spacing: 14px;
+        Icon {
+            icon: root.data.state == 1 ? Icons.check-circle : root.data.state == 2 ? Icons.warning : root.data.state == 3 ? Icons.x-circle : Icons.downloads;
+            tint: root.data.state == 1 ? Theme.green : root.data.state == 2 ? Theme.orange : root.data.state == 3 ? Theme.text-tertiary : Theme.accent;
+            size: 22px;
+            y: (parent.height - self.height) / 2;
+        }
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 6px;
+            alignment: center;
+            HorizontalLayout {
+                spacing: 8px;
+                Label {
+                    text: root.data.name;
+                    strong: true;
+                }
+                if root.data.server != "": Label {
+                    text: root.data.server;
+                    small: true;
+                    secondary: true;
+                }
+                Rectangle { horizontal-stretch: 1; }
+                if root.data.state == 0 && root.data.percent != "": Label {
+                    text: root.data.percent;
+                    secondary: true;
+                }
+            }
+            if root.data.state == 0: ProgressIndicator {
+                height: 6px;
+                indeterminate: root.data.progress < 0;
+                progress: max(root.data.progress, 0);
+            }
+            Text {
+                text: root.data.detail;
+                font-size: Theme.small-font-size;
+                color: root.data.state == 2 ? Theme.red : Theme.text-secondary;
+                wrap: word-wrap;
+            }
+        }
+        HorizontalLayout {
+            spacing: 2px;
+            alignment: center;
+            if root.data.state == 0: ToolButton {
+                icon: Icons.stop;
+                tooltip: @tr("Cancel");
+                clicked => { Api.cancel-download(root.data.id); }
+            }
+            if root.data.state == 1 && root.data.can-reveal: ToolButton {
+                icon: Icons.search;
+                tooltip: @tr("Show in Models");
+                clicked => { Api.reveal-download(root.data.id); }
+            }
+            if root.data.state >= 2: ToolButton {
+                icon: Icons.retry;
+                tooltip: @tr("Retry");
+                clicked => { Api.retry-download(root.data.id); }
+            }
+            if root.data.state != 0: ToolButton {
+                icon: Icons.close;
+                tooltip: @tr("Remove from List");
+                clicked => { Api.remove-download(root.data.id); }
+            }
+        }
+    }
+}
+
+export component DownloadsPage inherits VerticalLayout {
+    Toolbar {
+        title: @tr("Downloads");
+        ToolButton {
+            icon: Icons.close;
+            tooltip: @tr("Remove finished downloads from the list");
+            enabled: Api.has-finished-downloads;
+            y: (parent.height - self.height) / 2;
+            clicked => { Api.clear-finished(); }
+        }
+        ToolButton {
+            icon: Icons.plus;
+            tooltip: @tr("Pull a model from the Ollama library");
+            enabled: Api.connection == 1;
+            y: (parent.height - self.height) / 2;
+            clicked => { Api.open-dialog(1, ""); }
+        }
+    }
+    Divider { }
+    Rectangle {
+        vertical-stretch: 1;
+        if Api.downloads.length == 0: EmptyState {
+            icon: Icons.downloads;
+            title: @tr("No Downloads");
+            message: @tr("Models you pull or update appear here with their progress.");
+            HorizontalLayout {
+                alignment: center;
+                spacing: 8px;
+                Button {
+                    text: @tr("Pull a Model…");
+                    primary: true;
+                    enabled: Api.connection == 1;
+                    clicked => { Api.open-dialog(1, ""); }
+                }
+                Button {
+                    text: @tr("Discover Models");
+                    clicked => { Api.section = 3; }
+                }
+            }
+        }
+        if Api.downloads.length > 0: ScrollView {
+            VerticalLayout {
+                padding: 20px;
+                spacing: 10px;
+                alignment: start;
+                for row in Api.downloads: DownloadCard {
+                    data: row;
+                }
+            }
+        }
+    }
+}

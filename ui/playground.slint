@@ -1,0 +1,398 @@
+import { Button, ComboBox, ListView, ScrollView, Spinner, Switch, Slider, TextEdit } from "std-widgets.slint";
+import { Theme } from "theme.slint";
+import { Icons } from "icons.slint";
+import { Api, ChatRow } from "api.slint";
+import { Icon, Label, ToolButton, EmptyState, Divider, Toolbar, CodeBlock } from "components.slint";
+
+component MessageView inherits HorizontalLayout {
+    in property <ChatRow> data;
+    in property <length> available-width;
+    property <bool> show-thoughts;
+    alignment: data.is-user ? end : start;
+    padding-top: data.is-user ? 10px : 16px;
+    if root.data.is-user: VerticalLayout {
+        alignment: start;
+        spacing: 6px;
+        HorizontalLayout {
+            alignment: end;
+            spacing: 6px;
+            for image in root.data.images: Rectangle {
+                width: 90px;
+                height: 90px;
+                border-radius: 8px;
+                clip: true;
+                Image {
+                    source: image;
+                    width: parent.width;
+                    height: parent.height;
+                    image-fit: cover;
+                }
+            }
+        }
+        if root.data.text != "": Rectangle {
+            border-radius: 12px;
+            background: Theme.accent.with-alpha(Theme.dark ? 0.3 : 0.14);
+            max-width: root.available-width * 0.75;
+            HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 12px;
+                padding-top: 8px;
+                padding-bottom: 8px;
+                TextInput {
+                    text: root.data.text;
+                    read-only: true;
+                    single-line: false;
+                    wrap: word-wrap;
+                    color: Theme.text;
+                    font-size: Theme.font-size;
+                }
+            }
+        }
+    }
+    if !root.data.is-user: VerticalLayout {
+        spacing: 6px;
+        // Replies use a readable column; code blocks span its width.
+        width: min(root.available-width - 40px, 820px);
+        HorizontalLayout {
+            spacing: 6px;
+            Icon {
+                icon: Icons.models;
+                size: 12px;
+                tint: Theme.text-secondary;
+                y: (parent.height - self.height) / 2;
+            }
+            Label {
+                text: root.data.model;
+                small: true;
+                secondary: true;
+                strong: true;
+            }
+        }
+        if root.data.thinking != "": VerticalLayout {
+            spacing: 4px;
+            Rectangle {
+                height: 22px;
+                HorizontalLayout {
+                    spacing: 6px;
+                    alignment: start;
+                    Icon {
+                        icon: root.show-thoughts ? Icons.chevron-down : Icons.chevron-right;
+                        size: 12px;
+                        tint: Theme.text-secondary;
+                        y: (parent.height - self.height) / 2;
+                    }
+                    Icon {
+                        icon: Icons.brain;
+                        size: 13px;
+                        tint: Theme.text-secondary;
+                        y: (parent.height - self.height) / 2;
+                    }
+                    Label {
+                        text: root.data.streaming && root.data.text == "" ? @tr("Thinking…") : @tr("Thoughts");
+                        secondary: true;
+                    }
+                }
+                TouchArea {
+                    clicked => { root.show-thoughts = !root.show-thoughts; }
+                }
+            }
+            if root.show-thoughts: TextInput {
+                text: root.data.thinking;
+                read-only: true;
+                single-line: false;
+                wrap: word-wrap;
+                color: Theme.text-secondary;
+                font-size: Theme.small-font-size;
+            }
+        }
+        for part in root.data.parts: VerticalLayout {
+            if part.kind == 0: StyledText {
+                text: part.styled;
+                default-color: Theme.text;
+                default-font-size: Theme.font-size;
+                link-color: Theme.accent;
+                link-clicked(link) => { Api.open-url(link); }
+            }
+            if part.kind == 1: CodeBlock {
+                text: part.text;
+                limit: 420px;
+            }
+        }
+        if root.data.text == "" && root.data.streaming && root.data.thinking == "": Spinner {
+            width: 16px;
+            height: 16px;
+            indeterminate: true;
+        }
+        if root.data.text == "" && !root.data.streaming && root.data.error == "": Label {
+            text: @tr("The model returned an empty reply.");
+            secondary: true;
+        }
+        if root.data.error != "": Text {
+            text: root.data.error;
+            color: Theme.red;
+            font-size: Theme.font-size;
+            wrap: word-wrap;
+        }
+        if root.data.stats != "": Label {
+            text: root.data.stats;
+            small: true;
+            secondary: true;
+        }
+        HorizontalLayout {
+            alignment: start;
+            if root.data.text != "" && !root.data.streaming: ToolButton {
+                icon: Icons.copy;
+                icon-size: 13px;
+                width: 24px;
+                height: 22px;
+                tooltip: @tr("Copy");
+                clicked => { Api.copy-text(root.data.text); }
+            }
+        }
+    }
+}
+
+component PlaygroundOptions inherits Rectangle {
+    background: Theme.card;
+    border-radius: Theme.radius + 2px;
+    border-width: 1px;
+    border-color: Theme.card-stroke;
+    drop-shadow-blur: 18px;
+    drop-shadow-color: #00000040;
+    drop-shadow-offset-y: 4px;
+    width: 380px;
+    VerticalLayout {
+        padding: 14px;
+        spacing: 10px;
+        Label { text: @tr("System Prompt"); strong: true; }
+        TextEdit {
+            height: 90px;
+            text <=> Api.system-prompt;
+            wrap: word-wrap;
+            font-size: Theme.font-size;
+        }
+        HorizontalLayout {
+            Label { text: @tr("Custom temperature"); horizontal-stretch: 1; }
+            Switch { checked <=> Api.custom-temperature; }
+        }
+        if Api.custom-temperature: HorizontalLayout {
+            spacing: 8px;
+            Slider {
+                minimum: 0;
+                maximum: 2;
+                value <=> Api.temperature;
+            }
+            Label {
+                width: 36px;
+                text: round(Api.temperature * 100) / 100;
+                horizontal-alignment: right;
+            }
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            Label { text: @tr("Context window"); horizontal-stretch: 1; }
+            ComboBox {
+                width: 150px;
+                model: Api.context-labels;
+                current-index <=> Api.context-index;
+            }
+        }
+        if Api.chat-thinking-supported: HorizontalLayout {
+            Label { text: @tr("Thinking"); horizontal-stretch: 1; }
+            Switch { checked <=> Api.thinking-enabled; }
+        }
+    }
+}
+
+export component PlaygroundPage inherits VerticalLayout {
+    property <bool> show-options;
+    // Incremented on send: the transcript follows the new exchange again.
+    property <int> sent-count;
+    Toolbar {
+        title: @tr("Playground");
+        subtitle: Api.chat-model;
+        ToolButton {
+            icon: Icons.sliders;
+            tooltip: @tr("System prompt and generation options");
+            active: root.show-options;
+            y: (parent.height - self.height) / 2;
+            clicked => { root.show-options = !root.show-options; }
+        }
+        ToolButton {
+            icon: Icons.compose;
+            tooltip: @tr("New conversation");
+            enabled: Api.messages.length > 0;
+            y: (parent.height - self.height) / 2;
+            clicked => { Api.new-conversation(); }
+        }
+    }
+    Divider { }
+    transcript := Rectangle {
+        vertical-stretch: 1;
+        if Api.messages.length == 0 && Api.connection != 1: EmptyState {
+            icon: Api.connection == 2 ? Icons.offline : Icons.server;
+            title: Api.connection == 2 ? @tr("Ollama Is Not Reachable") : @tr("Connecting…");
+            message: Api.connection == 2 ? Api.connection-error : Api.server-url;
+        }
+        if Api.messages.length == 0 && Api.connection == 1: EmptyState {
+            icon: Icons.playground;
+            title: @tr("Try a Model");
+            message: Api.chat-model == "" ? @tr("Choose a model below, then send a message.") : @tr("Send a message to {}. Replies stream in with their speed in tokens per second.", Api.chat-model);
+        }
+        if Api.messages.length > 0: list := ListView {
+            // Follows the latest message while it streams in, unless the user scrolled up.
+            property <bool> follow: true;
+            property <int> sends: root.sent-count;
+            changed sends => {
+                self.follow = true;
+                self.scroll-to-end();
+            }
+            scrolled => { self.follow = self.content-y <= self.visible-height - self.content-height + 24px; }
+            changed content-height => { self.scroll-to-end(); }
+            changed visible-height => { self.scroll-to-end(); }
+            init => { self.scroll-to-end(); }
+            function scroll-to-end() {
+                if self.follow {
+                    self.content-y = min(0px, self.visible-height - self.content-height);
+                }
+            }
+            for message in Api.messages: VerticalLayout {
+                padding-left: 24px;
+                padding-right: 24px;
+                MessageView {
+                    data: message;
+                    available-width: transcript.width - 48px;
+                }
+            }
+        }
+        if root.show-options: PlaygroundOptions {
+            x: parent.width - self.width - 12px;
+            y: 8px;
+        }
+    }
+    Divider { }
+    VerticalLayout {
+        padding: 12px;
+        padding-left: 20px;
+        padding-right: 20px;
+        spacing: 8px;
+        HorizontalLayout {
+            spacing: 10px;
+            ComboBox {
+                width: 300px;
+                model: Api.chat-models;
+                current-value <=> Api.chat-model;
+                selected => { Api.chat-model-changed(); }
+            }
+            if Api.chat-hint != "": Text {
+                text: Api.chat-hint;
+                color: Theme.text-secondary;
+                font-size: Theme.small-font-size;
+                vertical-alignment: center;
+                wrap: word-wrap;
+                horizontal-stretch: 1;
+            }
+        }
+        if Api.attachments.length > 0: HorizontalLayout {
+            spacing: 8px;
+            alignment: start;
+            for image[index] in Api.attachments: Rectangle {
+                width: 56px;
+                height: 56px;
+                border-radius: 8px;
+                clip: true;
+                Image {
+                    source: image;
+                    width: parent.width;
+                    height: parent.height;
+                    image-fit: cover;
+                }
+                ToolButton {
+                    x: parent.width - self.width;
+                    y: 0;
+                    width: 20px;
+                    height: 20px;
+                    icon: Icons.close;
+                    icon-size: 11px;
+                    clicked => { Api.remove-attachment(index); }
+                }
+            }
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            if Api.chat-vision: ToolButton {
+                icon: Icons.attach;
+                tooltip: @tr("Attach images");
+                y: parent.height - self.height;
+                clicked => { Api.attach-images(); }
+            }
+            composer := Rectangle {
+                horizontal-stretch: 1;
+                height: min(max(36px, input.preferred-height + 16px), 180px);
+                border-radius: Theme.radius + 2px;
+                border-width: 1px;
+                border-color: input.has-focus ? Theme.accent : Theme.field-stroke;
+                background: Theme.field;
+                FocusScope {
+                    key-pressed(event) => {
+                        // Return sends, Shift+Return inserts a new line.
+                        if event.text == Key.Return && !event.modifiers.shift {
+                            root.send();
+                            return accept;
+                        }
+                        reject
+                    }
+                    input := TextInput {
+                        x: 12px;
+                        y: 8px;
+                        width: parent.width - 24px;
+                        height: parent.height - 16px;
+                        single-line: false;
+                        wrap: word-wrap;
+                        font-size: Theme.font-size;
+                        color: Theme.text;
+                        Text {
+                            visible: input.text == "";
+                            text: @tr("Message");
+                            color: Theme.text-tertiary;
+                            font-size: Theme.font-size;
+                            x: 0;
+                            y: 0;
+                        }
+                    }
+                }
+            }
+            if Api.generating: Button {
+                text: @tr("Stop");
+                icon: Icons.stop;
+                colorize-icon: true;
+                y: parent.height - self.height;
+                clicked => { Api.stop-generating(); }
+            }
+            if !Api.generating: Button {
+                text: @tr("Send");
+                icon: Icons.send;
+                colorize-icon: true;
+                primary: true;
+                enabled: Api.connection == 1 && Api.chat-model != "" && (input.text != "" || Api.attachments.length > 0);
+                y: parent.height - self.height;
+                clicked => { root.send(); }
+            }
+        }
+        Text {
+            text: @tr("Return to send · Shift+Return for a new line");
+            color: Theme.text-tertiary;
+            font-size: Theme.small-font-size;
+        }
+    }
+
+    function send() {
+        if Api.generating || Api.chat-model == "" || (input.text == "" && Api.attachments.length == 0) {
+            return;
+        }
+        root.sent-count += 1;
+        Api.send-message(input.text);
+        input.text = "";
+        input.focus();
+    }
+}

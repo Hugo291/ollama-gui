@@ -1,6 +1,7 @@
 .DS_Store
-/.build
-/.swiftpm
+.build/
+.swiftpm/
 /dist
+/target
 *.xcodeproj
 xcuserdata/

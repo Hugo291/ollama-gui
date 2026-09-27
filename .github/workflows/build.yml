@@ -10,37 +10,84 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  macos:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Toolchain
-        run: |
-          xcodebuild -version
-          swift --version
-
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Format
+        run: cargo fmt --check
       - name: Test
-        run: scripts/test.sh
-
+        run: cargo test --locked
       - name: Build app
-        run: scripts/build-app.sh
-
+        run: scripts/build-macos.sh
+      - name: Smoke test
+        # The app must still be running a few seconds after launch (no Ollama on the runner).
+        run: |
+          "dist/Ollama GUI.app/Contents/MacOS/ollama-gui" &
+          pid=$!
+          sleep 10
+          kill -0 "$pid"
+          kill "$pid"
       - uses: actions/upload-artifact@v4
         with:
-          name: OllamaGUI
-          path: dist/*.zip
+          name: OllamaGUI-macOS
+          path: dist/OllamaGUI-macOS.zip
 
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Test
+        run: cargo test --locked
+      - name: Build
+        run: cargo build --release --locked
+      - name: Smoke test
+        shell: pwsh
+        run: |
+          $app = Start-Process target\release\ollama-gui.exe -PassThru
+          Start-Sleep -Seconds 10
+          if ($app.HasExited) { throw "ollama-gui.exe exited with code $($app.ExitCode)" }
+          Stop-Process -Id $app.Id
+      - name: Installer
+        shell: pwsh
+        run: |
+          $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.*)"').Matches[0].Groups[1].Value
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress }
+          & $iscc "/DAppVersion=$version" packaging\windows\installer.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed" }
+          Copy-Item target\release\ollama-gui.exe dist\OllamaGUI-Windows-Portable.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OllamaGUI-Windows
+          path: dist/*.exe
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [macos, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
       - name: Attach to release
-        if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
+          ls -l dist
           if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
-            # Keep an asset that was already attached (its checksum may be in the notes).
-            gh release upload "$GITHUB_REF_NAME" dist/*.zip || echo "Asset already attached, keeping it."
+            gh release upload "$GITHUB_REF_NAME" dist/* --clobber
           else
-            gh release create "$GITHUB_REF_NAME" dist/*.zip --generate-notes
+            gh release create "$GITHUB_REF_NAME" dist/* --title "Ollama GUI ${GITHUB_REF_NAME#v}" --generate-notes
           fi
