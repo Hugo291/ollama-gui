@@ -61,17 +61,34 @@ pub enum LibrarySort {
     Newest,
 }
 
-/// `capability` is one of `vision`, `tools`, `thinking`, `embedding`, `cloud`.
-pub async fn search(http: &reqwest::Client, query: &str, capability: Option<&str>, sort: LibrarySort) -> Result<Vec<LibraryModel>, ApiError> {
-    let mut params = vec![("q", query)];
+/// One page of search results (ollama.com shows 20 per page).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct SearchPage {
+    pub models: Vec<LibraryModel>,
+    pub has_more: bool,
+}
+
+/// `capability` is one of `vision`, `tools`, `thinking`, `embedding`, `cloud`. Pages start at 1.
+pub async fn search(http: &reqwest::Client, query: &str, capability: Option<&str>, sort: LibrarySort, page: u32) -> Result<SearchPage, ApiError> {
+    let mut params = vec![("q", query.to_owned())];
     if let Some(capability) = capability {
-        params.push(("c", capability));
+        params.push(("c", capability.to_owned()));
     }
     if sort == LibrarySort::Newest {
-        params.push(("o", "newest"));
+        params.push(("o", "newest".to_owned()));
+    }
+    if page > 1 {
+        params.push(("page", page.to_string()));
     }
     let url = reqwest::Url::parse_with_params("https://ollama.com/search", &params).map_err(|e| ApiError::Unexpected(e.to_string()))?;
-    Ok(parse_search(&fetch(http, url.as_str()).await?))
+    // Later pages are htmx fragments: without this header the site redirects to page 1.
+    let html = fetch_with(http, url.as_str(), page > 1).await?;
+    Ok(SearchPage { models: parse_search(&html), has_more: has_page(&html, page + 1) })
+}
+
+/// Whether the page links to the given page ("load more" marker of ollama.com).
+pub fn has_page(html: &str, page: u32) -> bool {
+    NEXT_PAGE.captures_iter(html).any(|c| c[1].parse::<u32>().ok() == Some(page))
 }
 
 pub async fn tags(http: &reqwest::Client, model: &LibraryModel) -> Result<Vec<LibraryTag>, ApiError> {
@@ -79,7 +96,15 @@ pub async fn tags(http: &reqwest::Client, model: &LibraryModel) -> Result<Vec<Li
 }
 
 async fn fetch(http: &reqwest::Client, url: &str) -> Result<String, ApiError> {
-    let response = http.get(url).header("Accept", "text/html").timeout(Duration::from_secs(20)).send().await?;
+    fetch_with(http, url, false).await
+}
+
+async fn fetch_with(http: &reqwest::Client, url: &str, fragment: bool) -> Result<String, ApiError> {
+    let mut request = http.get(url).header("Accept", "text/html").timeout(Duration::from_secs(20));
+    if fragment {
+        request = request.header("HX-Request", "true");
+    }
+    let response = request.send().await?;
     if !response.status().is_success() {
         return Err(ApiError::Server(format!("ollama.com: HTTP {}", response.status())));
     }
@@ -100,6 +125,7 @@ static TAG_COUNT: LazyLock<Regex> = LazyLock::new(|| regex(r"(?is)<span[^>]*>([^
 static UPDATED: LazyLock<Regex> = LazyLock::new(|| regex(r"(?is)Updated(?:&nbsp;|\s)*</span>\s*<span[^>]*>([^<]*)</span>"));
 static TAG_BLOCK: LazyLock<Regex> = LazyLock::new(|| regex(r#"(?is)<a\s+href="/([^"]+:[^"]+)"\s+class="md:hidden[^"]*"[^>]*>(.*?)</a>"#));
 static DIGEST: LazyLock<Regex> = LazyLock::new(|| regex(r"\b([0-9a-f]{12})\b"));
+static NEXT_PAGE: LazyLock<Regex> = LazyLock::new(|| regex(r#"hx-get="/search\?[^"]*\bpage=(\d+)"#));
 static SIZE_BADGE: LazyLock<Regex> = LazyLock::new(|| regex(r"(?i)^(?:e?\d+(?:\.\d+)?|\d+x\d+(?:\.\d+)?)[kmbt]$"));
 static HTML_TAG: LazyLock<Regex> = LazyLock::new(|| regex(r"<[^>]+>"));
 static ENTITY: LazyLock<Regex> = LazyLock::new(|| regex(r"&(#[xX][0-9a-fA-F]+|#\d+|[a-zA-Z]+);"));
@@ -152,7 +178,8 @@ pub fn parse_tags(html: &str) -> Vec<LibraryTag> {
             continue;
         }
         let mut text = clean(block.get(2).map_or("", |m| m.as_str()));
-        if let Some(rest) = text.strip_prefix(name.as_str()) {
+        let short_name = name.rsplit('/').next().unwrap_or(&name);
+        if let Some(rest) = text.strip_prefix(name.as_str()).or_else(|| text.strip_prefix(short_name)) {
             text = rest.to_owned();
         }
         let (badges, digest, fields_text) = match DIGEST.captures(&text) {

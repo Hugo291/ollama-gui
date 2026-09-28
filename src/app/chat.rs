@@ -14,6 +14,9 @@ use crate::{Api, ChatPart, ChatRow};
 
 /// Context window choices; 0 keeps the model's default.
 const CONTEXT_CHOICES: [u64; 8] = [0, 2048, 4096, 8192, 16384, 32768, 65536, 131072];
+/// Limits for image attachments: they are sent base64-encoded with every message.
+const MAX_ATTACHMENTS: usize = 8;
+const MAX_IMAGE_MB: u64 = 20;
 
 #[derive(Clone)]
 struct Attachment {
@@ -30,31 +33,69 @@ struct Message {
     streaming: bool,
     error: Option<String>,
     stats: String,
+    /// The rendered reply, updated in place while it streams: the interface keeps its
+    /// blocks (and the scroll position inside code blocks) instead of recreating them.
+    parts: Rc<VecModel<ChatPart>>,
+    image_model: ModelRc<slint::Image>,
 }
 
 impl Message {
+    fn new(is_user: bool, text: String, images: Vec<Attachment>, model: String) -> Self {
+        let image_model = ModelRc::new(VecModel::from(images.iter().map(|a| a.image.clone()).collect::<Vec<_>>()));
+        Self {
+            is_user,
+            text,
+            thinking: String::new(),
+            images,
+            model,
+            streaming: !is_user,
+            error: None,
+            stats: String::new(),
+            parts: Rc::new(VecModel::default()),
+            image_model,
+        }
+    }
+
+    /// Renders the reply's Markdown into `parts`, changing only the blocks that differ.
+    fn render(&self) {
+        if self.is_user {
+            return;
+        }
+        let parts: Vec<ChatPart> = markdown::split(&self.text)
+            .into_iter()
+            .flat_map(|part| match part {
+                Part::Text(text) => markdown::styled(&text)
+                    .into_iter()
+                    .map(|styled| ChatPart { kind: 0, styled, text: text.clone().into(), language: SharedString::new() })
+                    .collect::<Vec<_>>(),
+                Part::Code { language, text } => vec![ChatPart { kind: 1, styled: Default::default(), text: text.into(), language: language.into() }],
+            })
+            .collect();
+        let count = parts.len();
+        for (index, part) in parts.into_iter().enumerate() {
+            if index >= self.parts.row_count() {
+                self.parts.push(part);
+            } else if self.parts.row_data(index).as_ref() != Some(&part) {
+                self.parts.set_row_data(index, part);
+            }
+        }
+        while self.parts.row_count() > count {
+            self.parts.remove(self.parts.row_count() - 1);
+        }
+    }
+
     fn row(&self) -> ChatRow {
-        let parts: Vec<ChatPart> = if self.is_user {
-            Vec::new()
-        } else {
-            markdown::split(&self.text)
-                .into_iter()
-                .map(|part| match part {
-                    Part::Text(text) => ChatPart { kind: 0, styled: markdown::styled(&text), text: text.into(), language: SharedString::new() },
-                    Part::Code { language, text } => ChatPart { kind: 1, styled: Default::default(), text: text.into(), language: language.into() },
-                })
-                .collect()
-        };
+        self.render();
         ChatRow {
             is_user: self.is_user,
             text: self.text.clone().into(),
-            parts: ModelRc::new(VecModel::from(parts)),
+            parts: ModelRc::from(self.parts.clone()),
             thinking: self.thinking.clone().into(),
             model: self.model.clone().into(),
             streaming: self.streaming,
             error: self.error.clone().unwrap_or_default().into(),
             stats: self.stats.clone().into(),
-            images: ModelRc::new(VecModel::from(self.images.iter().map(|a| a.image.clone()).collect::<Vec<_>>())),
+            images: self.image_model.clone(),
         }
     }
 }
@@ -147,11 +188,18 @@ pub fn bind(app: &Rc<App>, api: &Api) {
 }
 
 /// Opens the Playground with a model.
+/// Selects a chat model, with the dropdown's position in step with the list.
+fn set_chat_model(api: &Api, name: SharedString) {
+    let index = api.get_chat_models().iter().position(|model| model == name).unwrap_or(0);
+    api.set_chat_model_index(index as i32);
+    api.set_chat_model(name);
+}
+
 pub fn open_with(app: &Rc<App>, name: &str) {
     let ui = app.ui();
     let api = ui.global::<Api>();
     if !app.chat.borrow().generating {
-        api.set_chat_model(name.into());
+        set_chat_model(&api, name.into());
     }
     api.set_section(4);
     sync_hint(app);
@@ -160,19 +208,51 @@ pub fn open_with(app: &Rc<App>, name: &str) {
 fn attach_images(app: &Rc<App>) {
     let app = app.clone();
     let _ = slint::spawn_local(async move {
-        let Some(files) = rfd::AsyncFileDialog::new().add_filter("Images", &["png", "jpg", "jpeg", "webp"]).pick_files().await else { return };
+        let Some(files) = rfd::AsyncFileDialog::new().add_filter("Images", &["png", "jpg", "jpeg"]).pick_files().await else { return };
         // The dialog does not block the window: the model may have changed meanwhile.
         if !app.ui().global::<Api>().get_chat_vision() {
             return;
         }
+        let mut problems = Vec::new();
         for file in files {
+            if app.chat.borrow().attachments.len() >= MAX_ATTACHMENTS {
+                problems.push(app.text.too_many_images(MAX_ATTACHMENTS));
+                break;
+            }
             let path = file.path().to_owned();
-            let Ok(bytes) = std::fs::read(&path) else { continue };
-            let Ok(image) = slint::Image::load_from_path(&path) else { continue };
-            let base64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+            let name = file.file_name();
+            // Reading and encoding run off the interface thread: photos can be large.
+            let read_path = path.clone();
+            let encoded = app
+                .io(async move {
+                    let size = std::fs::metadata(&read_path).map(|m| m.len()).unwrap_or(0);
+                    if size > MAX_IMAGE_MB * 1_000_000 {
+                        return Err(true);
+                    }
+                    std::fs::read(&read_path).map(|bytes| base64::engine::general_purpose::STANDARD.encode(bytes)).map_err(|_| false)
+                })
+                .await;
+            let base64 = match encoded {
+                Some(Ok(base64)) => base64,
+                Some(Err(true)) => {
+                    problems.push(app.text.image_too_large(&name, MAX_IMAGE_MB));
+                    continue;
+                }
+                _ => {
+                    problems.push(app.text.image_unreadable(&name));
+                    continue;
+                }
+            };
+            let Ok(image) = slint::Image::load_from_path(&path) else {
+                problems.push(app.text.image_unreadable(&name));
+                continue;
+            };
             app.chat.borrow_mut().attachments.push(Attachment { image, base64 });
         }
         sync_attachments(&app);
+        if !problems.is_empty() {
+            app.toast(app.text.images_not_attached(), problems.join("\n"));
+        }
     });
 }
 
@@ -203,16 +283,7 @@ fn send(app: &Rc<App>, text: String) {
         }
         let images = if supports_vision { std::mem::take(&mut chat.attachments) } else { Vec::new() };
         chat.attachments.clear();
-        chat.messages.push(Message {
-            is_user: true,
-            text,
-            thinking: String::new(),
-            images,
-            model: String::new(),
-            streaming: false,
-            error: None,
-            stats: String::new(),
-        });
+        chat.messages.push(Message::new(true, text, images, String::new()));
 
         let mut history = Vec::new();
         let system = api.get_system_prompt().trim().to_owned();
@@ -229,16 +300,7 @@ fn send(app: &Rc<App>, text: String) {
                 images: message.images.iter().map(|a| a.base64.clone()).collect(),
             });
         }
-        chat.messages.push(Message {
-            is_user: false,
-            text: String::new(),
-            thinking: String::new(),
-            images: Vec::new(),
-            model: model_name.clone(),
-            streaming: true,
-            error: None,
-            stats: String::new(),
-        });
+        chat.messages.push(Message::new(false, String::new(), Vec::new(), model_name.clone()));
         chat.generating = true;
         let count = chat.messages.len();
         let user_row = chat.messages[count - 2].row();
@@ -272,7 +334,7 @@ fn send(app: &Rc<App>, text: String) {
             let chunk = match chunk {
                 Ok(chunk) => chunk,
                 Err(error) => {
-                    failure = Some(error.to_string());
+                    failure = Some(app.text.api_error(&error));
                     break;
                 }
             };
@@ -334,17 +396,18 @@ pub fn sync_models(app: &Rc<App>) {
             .unwrap_or_default();
         (chat_models.iter().map(|m| SharedString::from(m.name.as_str())).collect::<Vec<_>>(), preferred)
     };
+    // Read before replacing the list: the dropdown then selects by position.
     let current = api.get_chat_model();
-    if !app.chat.borrow().generating && !names.contains(&current) {
-        api.set_chat_model(preferred);
-    }
     let unchanged = {
         let existing = api.get_chat_models();
         existing.row_count() == names.len() && existing.iter().zip(&names).all(|(a, b)| a == *b)
     };
     if !unchanged {
-        api.set_chat_models(ModelRc::new(VecModel::from(names)));
+        api.set_chat_models(ModelRc::new(VecModel::from(names.clone())));
     }
+    // Keep the chosen model (it may have moved in the list), or pick another one if it is gone.
+    let chosen = if app.chat.borrow().generating || names.contains(&current) { current } else { preferred };
+    set_chat_model(&api, chosen);
     sync_hint(app);
 }
 

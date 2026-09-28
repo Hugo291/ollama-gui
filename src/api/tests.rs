@@ -139,13 +139,50 @@ fn server_addresses() {
         ("https://ollama.example.com", "https://ollama.example.com"),
         ("https://example.com/ollama/", "https://example.com/ollama"),
         ("0.0.0.0:11434", "http://127.0.0.1:11434"),
+        // An explicit port 80 (a reverse proxy) is kept, and survives a round trip.
+        ("http://example.com:80", "http://example.com:80"),
+        ("example.com:80/ollama", "http://example.com:80/ollama"),
+        ("http://example.com:80", "http://example.com:80"),
+        ("[::1]", "http://[::1]:11434"),
+        ("http://[::1]:8080", "http://[::1]:8080"),
+        // Forms the Ollama CLI accepts.
+        ("::1", "http://[::1]:11434"),
+        (":8080", "http://127.0.0.1:8080"),
+        ("[::]:11434", "http://[::1]:11434"),
+        // Copied from the API documentation.
+        ("http://localhost:11434/api", "http://localhost:11434"),
+        ("https://example.com/ollama/api/", "https://example.com/ollama"),
     ];
     for (input, expected) in cases {
         let url = parse_address(input).unwrap_or_else(|| panic!("{input}"));
-        assert_eq!(super::client::display_url(&url), expected, "{input}");
+        let shown = super::client::display_url(&url);
+        assert_eq!(shown, expected, "{input}");
+        let again = parse_address(&shown).unwrap_or_else(|| panic!("{shown}"));
+        assert_eq!(again, url, "round trip of {input}");
     }
     for bad in ["", "ftp://host", "http://", "not a host"] {
         assert!(parse_address(bad).is_none(), "{bad:?}");
+    }
+    // Credentials are sent but never shown.
+    let url = parse_address("https://user:secret@example.com").expect("address");
+    assert_eq!(super::client::display_url(&url), "https://example.com");
+    assert_eq!(super::client::address_text(&url), "https://user:secret@example.com");
+    let url = parse_address("http://user:secret@example.com:80").expect("address");
+    assert_eq!(super::client::address_text(&url), "http://user:secret@example.com:80");
+}
+
+#[test]
+fn ollama_host_like_the_cli() {
+    use super::client::{address_text, parse_ollama_host};
+    let cases = [
+        ("127.0.0.1", "http://127.0.0.1:11434"),
+        ("0.0.0.0:11434", "http://127.0.0.1:11434"),
+        ("http://example.com", "http://example.com:80"),
+        ("http://example.com:8080", "http://example.com:8080"),
+        ("https://example.com", "https://example.com"),
+    ];
+    for (value, expected) in cases {
+        assert_eq!(parse_ollama_host(value).map(|url| address_text(&url)).as_deref(), Some(expected), "{value}");
     }
 }
 
@@ -217,6 +254,22 @@ fn parses_tags() {
     assert_eq!(tags[1].badges, ["MLX"]);
     assert_eq!(tags[1].tag(), "27b-mlx");
     assert_eq!(tags[2].size.as_deref(), Some("Extra High Usage"));
+    // User models: the page shows the name without the namespace, which is not a badge.
+    let user = parse_tags(
+        r#"<a href="/x/z-image-turbo:latest" class="md:hidden flex flex-col"><span>z-image-turbo:latest</span> <span class="font-mono">1a2b3c4d5e6f</span> • 13GB • Text input • 3 months ago</a>"#,
+    );
+    assert_eq!(user.len(), 1);
+    assert_eq!(user[0].name, "x/z-image-turbo:latest");
+    assert!(user[0].badges.is_empty(), "{:?}", user[0].badges);
+}
+
+#[test]
+fn search_pages() {
+    use super::library::has_page;
+    let html = r#"<li>…</li><div hx-get="/search?page=2&q=qwen" hx-trigger="revealed"></div>"#;
+    assert!(has_page(html, 2));
+    assert!(!has_page(html, 3));
+    assert!(!has_page(SEARCH_HTML, 2));
 }
 
 #[test]
@@ -238,6 +291,10 @@ fn formatting() {
     assert_eq!(format::bytes(291_554_930, Lang::En), "291.6 MB");
     assert_eq!(format::bytes(12_773_500_825, Lang::En), "12.77 GB");
     assert_eq!(format::bytes(1_157_672_605, Lang::Fr), "1,16 Go");
+    // Rounded before choosing the unit.
+    assert_eq!(format::bytes(999_960_000, Lang::En), "1.00 GB");
+    assert_eq!(format::bytes(999_500, Lang::Fr), "1,0 Mo");
+    assert_eq!(format::bytes(999_994_000_000, Lang::En), "999.99 GB");
     assert_eq!(format::duration(std::time::Duration::from_secs(3900)), "1 h 05 min");
     assert_eq!(format::relative_time(chrono::TimeDelta::days(21), Lang::En), "3 wk ago");
     assert_eq!(format::relative_time(chrono::TimeDelta::days(21), Lang::Fr), "il y a 3 sem.");

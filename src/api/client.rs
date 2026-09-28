@@ -19,12 +19,15 @@ pub enum ApiError {
     Server(String),
     /// The response wasn't what the API documents.
     Unexpected(String),
+    /// The server accepted the request but stopped answering.
+    Timeout,
 }
 
 impl std::fmt::Display for ApiError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ApiError::Network(message) | ApiError::Server(message) | ApiError::Unexpected(message) => f.write_str(message),
+            ApiError::Timeout => f.write_str("The server isn't responding."),
         }
     }
 }
@@ -40,7 +43,13 @@ impl From<reqwest::Error> for ApiError {
             message = cause.to_string();
             source = cause.source();
         }
-        if error.is_decode() { ApiError::Unexpected(message) } else { ApiError::Network(message) }
+        if error.is_timeout() {
+            ApiError::Timeout
+        } else if error.is_decode() {
+            ApiError::Unexpected(message)
+        } else {
+            ApiError::Network(message)
+        }
     }
 }
 
@@ -53,32 +62,88 @@ pub fn parse_address(input: &str) -> Option<Url> {
     if text.is_empty() || text.contains(char::is_whitespace) {
         return None;
     }
-    let with_scheme = match text.split_once("://") {
-        Some((scheme, _)) if scheme.eq_ignore_ascii_case("http") || scheme.eq_ignore_ascii_case("https") => text.to_owned(),
+    let (scheme, rest) = match text.split_once("://") {
+        Some((scheme, rest)) if scheme.eq_ignore_ascii_case("http") || scheme.eq_ignore_ascii_case("https") => (scheme.to_ascii_lowercase(), rest),
         Some(_) => return None,
-        None => format!("http://{text}"),
+        None => ("http".to_owned(), text),
     };
+    // Forms the Ollama CLI accepts too: a bare IPv6 address, and a port without host (`:8080`).
+    let rest = if rest.parse::<std::net::Ipv6Addr>().is_ok() {
+        format!("[{rest}]")
+    } else if rest.starts_with(':') {
+        format!("127.0.0.1{rest}")
+    } else {
+        rest.to_owned()
+    };
+    let with_scheme = format!("{scheme}://{rest}");
     let mut url = Url::parse(&with_scheme).ok()?;
     if url.host_str().is_none_or(str::is_empty) {
         return None;
     }
-    if url.port().is_none() && url.scheme() == "http" {
+    if !has_explicit_port(&with_scheme) && url.scheme() == "http" {
         url.set_port(Some(DEFAULT_PORT)).ok()?;
     }
-    // 0.0.0.0 is a bind address; connect through the loopback interface instead.
-    if url.host_str() == Some("0.0.0.0") {
-        url.set_host(Some("127.0.0.1")).ok()?;
+    // Bind-all addresses: connect through the loopback interface instead.
+    match url.host_str() {
+        Some("0.0.0.0") => url.set_host(Some("127.0.0.1")).ok()?,
+        Some("[::]") => url.set_host(Some("[::1]")).ok()?,
+        _ => {}
     }
-    let path = url.path().trim_end_matches('/').to_owned();
+    // An address copied from the API documentation (`…/api`) names the same server.
+    let path = url.path().trim_end_matches('/');
+    let path = path.strip_suffix("/api").unwrap_or(path).to_owned();
     url.set_path(&path);
     url.set_query(None);
     url.set_fragment(None);
     Some(url)
 }
 
-/// Canonical display form of a base URL (no trailing slash).
+/// Reads `OLLAMA_HOST` the way the Ollama CLI does: without a scheme the port defaults
+/// to 11434, but `http://host` means port 80 (and `https://host` port 443).
+pub fn parse_ollama_host(value: &str) -> Option<Url> {
+    let value = value.trim();
+    let mut url = parse_address(value)?;
+    let explicit_http = value.get(..7).is_some_and(|start| start.eq_ignore_ascii_case("http://"));
+    if explicit_http && !has_explicit_port(value) {
+        url.set_port(None).ok()?;
+    }
+    Some(url)
+}
+
+/// Whether the authority of `url` (`scheme://authority/…`) names a port, IPv6 hosts included.
+fn has_explicit_port(url: &str) -> bool {
+    let rest = url.split_once("://").map_or(url, |(_, rest)| rest);
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
+    let host_port = authority.rsplit_once('@').map_or(authority, |(_, host)| host);
+    match host_port.rfind(']') {
+        Some(end) => host_port[end..].contains(':'),
+        None => host_port.contains(':'),
+    }
+}
+
+/// What the interface shows: the address without credentials (`https://user:secret@host`).
 pub fn display_url(url: &Url) -> String {
-    url.as_str().trim_end_matches('/').to_owned()
+    let mut shown = url.clone();
+    let _ = shown.set_username("");
+    let _ = shown.set_password(None);
+    address_text(&shown)
+}
+
+/// Address text that `parse_address` reads back to the same URL, credentials included.
+pub fn address_text(url: &Url) -> String {
+    let text = url.as_str().trim_end_matches('/').to_owned();
+    // Url hides the default port 80; write it, since a plain HTTP address without a port means 11434 here.
+    if url.scheme() == "http"
+        && url.port().is_none()
+        && let Some(host) = url.host_str()
+    {
+        let start = "http://".len();
+        let end = text[start..].find('/').map_or(text.len(), |i| start + i);
+        if text[start..end].ends_with(host) {
+            return format!("{}:80{}", &text[..end], &text[end..]);
+        }
+    }
+    text
 }
 
 /// A running stream (pull, create, chat). Dropping the handle, or aborting
@@ -114,12 +179,12 @@ pub struct OllamaClient {
 
 impl OllamaClient {
     pub fn new(base: Url) -> Self {
-        let http = reqwest::Client::builder()
-            .connect_timeout(Duration::from_secs(5))
-            .user_agent(concat!("OllamaGUI/", env!("CARGO_PKG_VERSION")))
-            .build()
-            .expect("HTTP client");
-        Self { base, http }
+        let mut builder = reqwest::Client::builder().connect_timeout(Duration::from_secs(5)).user_agent(concat!("OllamaGUI/", env!("CARGO_PKG_VERSION")));
+        // Like the Ollama CLI, requests to this computer never go through HTTP_PROXY / ALL_PROXY.
+        if matches!(base.host_str(), Some("localhost" | "127.0.0.1" | "[::1]")) {
+            builder = builder.no_proxy();
+        }
+        Self { base, http: builder.build().expect("HTTP client") }
     }
 
     fn url(&self, path: &str) -> Url {
@@ -177,7 +242,9 @@ impl OllamaClient {
 
     /// Loads a model into memory for `keep_alive_seconds`.
     pub async fn load(&self, model: &str, keep_alive_seconds: u64, is_embedding: bool) -> ApiResult<()> {
-        let timeout = Duration::from_secs(15 * 60);
+        // Ollama answers once the model is in memory, and cancels the load if the request
+        // is dropped: allow for very large models on slow disks.
+        let timeout = Duration::from_secs(3600);
         if is_embedding {
             let body = json!({ "model": model, "input": [], "keep_alive": keep_alive_seconds });
             self.request(Method::POST, "api/embed", Some(body), timeout).await.map(|_| ())
@@ -248,7 +315,7 @@ async fn run_stream<T>(request: reqwest::RequestBuilder, decode: fn(&Value) -> T
         // only give up after an hour without any data.
         let next = tokio::time::timeout(Duration::from_secs(3600), bytes.next()).await;
         let chunk = match next {
-            Err(_) => return Err(ApiError::Network("The server stopped responding.".into())),
+            Err(_) => return Err(ApiError::Timeout),
             Ok(None) => break,
             Ok(Some(chunk)) => chunk?,
         };

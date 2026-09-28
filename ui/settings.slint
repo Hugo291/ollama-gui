@@ -34,6 +34,24 @@ component ServerCard inherits Card {
     property <string> tested-address;
     property <string> edit-name;
     property <string> edit-address;
+    // A server that was just added opens in the editor.
+    init => {
+        if root.server.id == Api.new-server-id {
+            root.start-editing();
+        }
+    }
+    function start-editing() {
+        root.edit-name = root.server.name;
+        root.edit-address = root.server.address;
+        root.tested-address = "";
+        root.editing = true;
+    }
+    function stop-editing() {
+        root.editing = false;
+        if Api.new-server-id == root.server.id {
+            Api.new-server-id = "";
+        }
+    }
     VerticalLayout {
         padding: 14px;
         spacing: 10px;
@@ -81,10 +99,11 @@ component ServerCard inherits Card {
                 tooltip: @tr("Edit");
                 y: (parent.height - self.height) / 2;
                 clicked => {
-                    root.edit-name = root.server.name;
-                    root.edit-address = root.server.address;
-                    root.tested-address = "";
-                    root.editing = !root.editing;
+                    if root.editing {
+                        root.stop-editing();
+                    } else {
+                        root.start-editing();
+                    }
                 }
             }
             ToolButton {
@@ -129,13 +148,13 @@ component ServerCard inherits Card {
                         Api.test-server(root.edit-address);
                     }
                 }
-                if Api.testing && root.tested-address == root.edit-address: Spinner {
+                if Api.testing && root.tested-address == root.edit-address && Api.test-address == root.edit-address: Spinner {
                     width: 16px;
                     height: 16px;
                     indeterminate: true;
                     y: (parent.height - self.height) / 2;
                 }
-                if !Api.testing && Api.test-result != "" && root.tested-address == root.edit-address: Text {
+                if !Api.testing && Api.test-result != "" && root.tested-address == root.edit-address && Api.test-address == root.edit-address: Text {
                     text: Api.test-result;
                     color: Api.test-ok ? Theme.green : Theme.red;
                     font-size: Theme.small-font-size;
@@ -146,14 +165,16 @@ component ServerCard inherits Card {
                 Rectangle { horizontal-stretch: 1; }
                 Button {
                     text: @tr("Cancel");
-                    clicked => { root.editing = false; }
+                    clicked => { root.stop-editing(); }
                 }
                 Button {
                     text: @tr("Save");
                     primary: true;
+                    // An invalid address can't be saved (the line above says why).
+                    enabled: Api.address-is-valid(root.edit-address);
                     clicked => {
                         Api.save-server(root.server.id, root.edit-name, root.edit-address);
-                        root.editing = false;
+                        root.stop-editing();
                     }
                 }
             }

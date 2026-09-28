@@ -42,6 +42,7 @@
 - Several Ollama servers (this computer, a machine on your network, a remote host) with a quick switcher.
 - Menu bar icon (macOS) or notification area icon (Windows) with the loaded models and active downloads.
 - Light and dark themes, English and French.
+- Keyboard shortcuts: ⌘1–⌘6 pages, ⌘N pull a model, ⌘R refresh, ⇧⌘U check for updates, ⌘↩ chat with the selected model, ⌘D duplicate, ⌘⌫ delete, ↑/↓ to move in the list, Return to send in the Playground (Ctrl instead of ⌘ on Windows).
 
 | Running models | Discover | Playground |
 | --- | --- | --- |
@@ -110,7 +111,7 @@ No analytics, no account. The app only talks to the Ollama servers you configure
 
 ## Français
 
-**Ollama GUI** est une app pour macOS et Windows qui gère vos modèles Ollama : liste des modèles installés (taille, paramètres, quantification, capacités), détails complets, **recherche de mises à jour** sur le registre Ollama, téléchargement avec progression, bibliothèque ollama.com (recherche, tags, téléchargement en un clic), modèles en mémoire (chargement, déchargement, compte à rebours), duplication, renommage, **personnalisation** (prompt système et paramètres), suppression, et un **bac à sable** pour discuter avec un modèle et mesurer sa vitesse. Plusieurs serveurs, icône dans la barre des menus (macOS) ou la zone de notification (Windows), thèmes clair et sombre, interface en français et en anglais.
+**Ollama GUI** est une app pour macOS et Windows qui gère vos modèles Ollama : liste des modèles installés (taille, paramètres, quantification, capacités), détails complets, **recherche de mises à jour** sur le registre Ollama, téléchargement avec progression, bibliothèque ollama.com (recherche, tags, téléchargement en un clic), modèles en mémoire (chargement, déchargement, compte à rebours), duplication, renommage, **personnalisation** (prompt système et paramètres), suppression, et un **bac à sable** pour discuter avec un modèle et mesurer sa vitesse. Plusieurs serveurs, icône dans la barre des menus (macOS) ou la zone de notification (Windows), thèmes clair et sombre, raccourcis clavier (⌘1–⌘6, ⌘N, ⌘R, ⇧⌘U, ⌘↩, ⌘D, ⌘⌫ ; Ctrl sous Windows), interface en français et en anglais.
 
 Installation :
 - **macOS** : téléchargez [`OllamaGUI-macOS.zip`](https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-macOS.zip), dézippez, glissez l'app dans Applications, puis clic droit → **Ouvrir** au premier lancement (app non notarisée).

@@ -44,10 +44,14 @@ pub fn split(markdown: &str) -> Vec<Part> {
                 continue;
             }
             flush_text(&mut parts, &mut text);
+            // Fences inside list items are indented: remove that indentation from the code.
+            let indent = line.len() - line.trim_start().len();
             let mut code = Vec::new();
             index += 1;
             while index < lines.len() && !is_closing_fence(lines[index], &marker) {
-                code.push(lines[index]);
+                let code_line = lines[index];
+                let removable = code_line.len() - code_line.trim_start_matches(' ').len();
+                code.push(&code_line[removable.min(indent)..]);
                 index += 1;
             }
             index += 1;
@@ -85,10 +89,8 @@ fn flush_text(parts: &mut Vec<Part>, text: &mut String) {
 
 /// Returns the fence (```` ``` ```` or `~~~`, possibly longer) and the language.
 fn opening_fence(line: &str) -> Option<(String, String)> {
+    // Any indentation: models indent fences under list items.
     let trimmed = line.trim_start();
-    if line.len() - trimmed.len() > 3 {
-        return None;
-    }
     let first = trimmed.chars().next().filter(|c| *c == '`' || *c == '~')?;
     let count = trimmed.chars().take_while(|c| *c == first).count();
     if count < 3 {
@@ -220,8 +222,17 @@ fn escape_html(line: &str) -> String {
 }
 
 /// Styled text for a text part, or plain text when the Markdown is still rejected.
-pub fn styled(markdown: &str) -> slint::StyledText {
-    slint::StyledText::from_markdown(markdown).unwrap_or_else(|_| slint::StyledText::from_plain_text(markdown))
+/// Styled text for a text part. When Slint still rejects the Markdown, only the paragraphs
+/// it rejects fall back to plain text.
+pub fn styled(markdown: &str) -> Vec<slint::StyledText> {
+    if let Ok(styled) = slint::StyledText::from_markdown(markdown) {
+        return vec![styled];
+    }
+    markdown
+        .split("\n\n")
+        .filter(|block| !block.trim().is_empty())
+        .map(|block| slint::StyledText::from_markdown(block).unwrap_or_else(|_| slint::StyledText::from_plain_text(block)))
+        .collect()
 }
 
 #[cfg(test)]
@@ -256,6 +267,20 @@ mod tests {
             split(reply),
             vec![Part::Text("**Fruits**\n\n- **Pomme**".into()), Part::Code { language: "python".into(), text: "print(1)".into() }, Part::Text("Fin".into()),]
         );
+    }
+
+    #[test]
+    fn indented_fences_under_list_items() {
+        let parts = split("1. Install:\n    ```bash\n    pip install x\n      --upgrade\n    ```\n2. Done");
+        assert_eq!(parts[1], Part::Code { language: "bash".into(), text: "pip install x\n  --upgrade".into() });
+        assert_eq!(parts[2], Part::Text("2. Done".into()));
+    }
+
+    #[test]
+    fn rejected_paragraphs_fall_back_alone() {
+        // An indented code block (4 spaces after a blank line) is rejected by Slint.
+        let styled = styled("**Bold** intro\n\n    indented code\n\nEnd");
+        assert_eq!(styled.len(), 3);
     }
 
     #[test]

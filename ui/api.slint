@@ -168,6 +168,8 @@ export global Api {
     in property <int> update-count;
     in property <bool> checking-updates;
     in-out property <string> selected-model;
+    // Row of selected-model in models, -1 when it isn't shown.
+    in property <int> selected-index: -1;
     in property <bool> has-detail;
     in property <ModelDetail> detail;
     in-out property <string> model-search;
@@ -225,6 +227,7 @@ export global Api {
     in property <bool> show-memory-gauge;
     in property <[string]> loadable-models;
     in property <[string]> keep-alive-labels;
+    in property <string> load-menu-tooltip;
     callback keep-loaded(name: string, choice: int);
     callback unload-all();
 
@@ -233,6 +236,8 @@ export global Api {
     in property <int> active-downloads;
     in property <bool> has-finished-downloads;
     callback cancel-download(id: int);
+    // Cancels the running pull of a model on the current server.
+    callback cancel-pull(name: string);
     callback retry-download(id: int);
     callback remove-download(id: int);
     callback reveal-download(id: int);
@@ -245,6 +250,10 @@ export global Api {
     // 0 popular, 1 newest
     in-out property <int> library-sort;
     callback library-search();
+    // ollama.com pages its results: the list asks for the next page at its end.
+    in property <bool> library-has-more;
+    in property <bool> library-loading-more;
+    callback library-load-more();
     in property <[LibraryRow]> library-results;
     in property <bool> library-loading;
     in property <string> library-error;
@@ -262,12 +271,17 @@ export global Api {
     // Playground
     in property <[ChatRow]> messages;
     in-out property <string> chat-model;
+    // Position of chat-model in chat-models, set with it: the dropdown keeps its position
+    // when its list changes, which would otherwise select another model.
+    in-out property <int> chat-model-index;
     in property <[string]> chat-models;
     in property <bool> generating;
     in property <string> chat-hint;
     in property <bool> chat-vision;
     in property <bool> chat-thinking-supported;
     in-out property <string> system-prompt;
+    // Message being written, kept while visiting other pages.
+    in-out property <string> chat-draft;
     in-out property <bool> custom-temperature;
     in-out property <float> temperature: 0.7;
     in-out property <int> context-index;
@@ -287,8 +301,13 @@ export global Api {
     callback remove-server(id: string);
     callback save-server(id: string, name: string, address: string);
     pure callback address-preview(address: string) -> string;
+    pure callback address-is-valid(address: string) -> bool;
+    // Id of the server added last, which opens in the editor.
+    in-out property <string> new-server-id;
     callback test-server(address: string);
     in property <bool> testing;
+    // Address of the last connection test, whose result is test-ok / test-result.
+    in property <string> test-address;
     in property <bool> test-ok;
     in property <string> test-result;
     in-out property <int> keep-alive-index;

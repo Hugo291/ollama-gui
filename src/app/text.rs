@@ -2,6 +2,7 @@
 
 use std::time::Duration;
 
+use crate::api::client::ApiError;
 use crate::api::format::{self, Lang};
 
 pub struct Text {
@@ -74,7 +75,7 @@ impl Text {
     pub fn loaded_count(&self, count: usize) -> String {
         match (self.lang, count) {
             (Lang::En, n) => format!("{n} loaded"),
-            (Lang::Fr, 1) => "1 chargé".into(),
+            (Lang::Fr, 0 | 1) => format!("{count} chargé"),
             (Lang::Fr, n) => format!("{n} chargés"),
         }
     }
@@ -88,6 +89,13 @@ impl Text {
 
     pub fn cloud(&self) -> String {
         "Cloud".into()
+    }
+
+    pub fn unloads_at(&self, time: &str) -> String {
+        match self.lang {
+            Lang::En => format!("Unloads at {time}"),
+            Lang::Fr => format!("Déchargement à {time}"),
+        }
     }
 
     pub fn never(&self) -> String {
@@ -124,6 +132,13 @@ impl Text {
         match self.lang {
             Lang::En => format!("Load the model into memory for {}", self.keep_alive_label(seconds)),
             Lang::Fr => format!("Charger le modèle en mémoire pendant {}", self.keep_alive_label(seconds)),
+        }
+    }
+
+    pub fn load_menu_tooltip(&self, seconds: u64) -> String {
+        match self.lang {
+            Lang::En => format!("Load a model into memory for {}", self.keep_alive_label(seconds)),
+            Lang::Fr => format!("Charger un modèle en mémoire pendant {}", self.keep_alive_label(seconds)),
         }
     }
 
@@ -200,6 +215,40 @@ impl Text {
     }
 
     // Errors
+
+    /// Message for an API error in the interface language. Messages from Ollama itself stay as they are.
+    pub fn api_error(&self, error: &ApiError) -> String {
+        match (error, self.lang) {
+            (ApiError::Network(detail), Lang::En) => format!("Couldn't reach the server: {detail}"),
+            (ApiError::Network(detail), Lang::Fr) => format!("Impossible de joindre le serveur : {detail}"),
+            (ApiError::Timeout, _) => self.pick("The server isn't responding.", "Le serveur ne répond pas."),
+            (ApiError::Server(message), _) => message.clone(),
+            (ApiError::Unexpected(detail), Lang::En) => format!("Unexpected response from the server: {detail}"),
+            (ApiError::Unexpected(detail), Lang::Fr) => format!("Réponse inattendue du serveur : {detail}"),
+        }
+    }
+
+    pub fn images_not_attached(&self) -> String {
+        self.pick("Some images weren't attached", "Certaines images n’ont pas été jointes")
+    }
+    pub fn image_too_large(&self, name: &str, limit_mb: u64) -> String {
+        match self.lang {
+            Lang::En => format!("{name} is larger than {limit_mb} MB."),
+            Lang::Fr => format!("{name} dépasse {limit_mb} Mo."),
+        }
+    }
+    pub fn image_unreadable(&self, name: &str) -> String {
+        match self.lang {
+            Lang::En => format!("{name} couldn't be read as an image."),
+            Lang::Fr => format!("{name} n’a pas pu être lue comme une image."),
+        }
+    }
+    pub fn too_many_images(&self, limit: usize) -> String {
+        match self.lang {
+            Lang::En => format!("At most {limit} images per message."),
+            Lang::Fr => format!("{limit} images au maximum par message."),
+        }
+    }
 
     pub fn could_not_delete(&self, name: &str) -> String {
         match self.lang {
@@ -298,16 +347,141 @@ impl Text {
         if let Some(pulls) = pulls {
             parts.push(match self.lang {
                 Lang::En => format!("{pulls} pulls"),
-                Lang::Fr => format!("{pulls} téléchargements"),
+                Lang::Fr => format!("{} téléchargements", self.site_count(pulls)),
             });
         }
         if let Some(tags) = tags {
             parts.push(if tags == "1" { "1 tag".into() } else { format!("{tags} tags") });
         }
         if let Some(updated) = updated {
-            parts.push(updated.to_owned());
+            parts.push(self.site_date(updated));
         }
         parts.join(" · ")
+    }
+
+    // Values read from ollama.com, which is in English.
+
+    /// `21.4M` → `21,4 M`.
+    pub fn site_count(&self, text: &str) -> String {
+        match self.lang {
+            Lang::En => text.to_owned(),
+            Lang::Fr => {
+                let text = text.replace('.', ",");
+                match text.char_indices().find(|(_, c)| c.is_ascii_alphabetic()) {
+                    Some((index, _)) => format!("{}\u{202f}{}", &text[..index], &text[index..]),
+                    None => text,
+                }
+            }
+        }
+    }
+
+    /// `2 weeks ago` → `il y a 2 semaines`.
+    pub fn site_date(&self, text: &str) -> String {
+        use std::sync::LazyLock;
+        static AGO: LazyLock<regex::Regex> =
+            LazyLock::new(|| regex::Regex::new(r"(?i)^(\d+|an?|one)\s+(second|minute|hour|day|week|month|year)s?\s+ago$").expect("regex"));
+        if self.lang == Lang::En {
+            return text.to_owned();
+        }
+        let text = text.trim();
+        if text.eq_ignore_ascii_case("yesterday") {
+            return "hier".into();
+        }
+        let Some(captures) = AGO.captures(text) else { return text.to_owned() };
+        let count: u64 = captures[1].parse().unwrap_or(1);
+        let plural = count > 1;
+        let unit = match captures[2].to_lowercase().as_str() {
+            "second" => {
+                if plural {
+                    "secondes"
+                } else {
+                    "seconde"
+                }
+            }
+            "minute" => {
+                if plural {
+                    "minutes"
+                } else {
+                    "minute"
+                }
+            }
+            "hour" => {
+                if plural {
+                    "heures"
+                } else {
+                    "heure"
+                }
+            }
+            "day" => {
+                if plural {
+                    "jours"
+                } else {
+                    "jour"
+                }
+            }
+            "week" => {
+                if plural {
+                    "semaines"
+                } else {
+                    "semaine"
+                }
+            }
+            "month" => "mois",
+            _ => {
+                if plural {
+                    "ans"
+                } else {
+                    "an"
+                }
+            }
+        };
+        format!("il y a {count} {unit}")
+    }
+
+    /// Download size (`5.2GB` → `5,2 Go`), or the usage level of cloud models.
+    pub fn site_size(&self, text: &str) -> String {
+        use std::sync::LazyLock;
+        static SIZE: LazyLock<regex::Regex> = LazyLock::new(|| regex::Regex::new(r"(?i)^([\d.]+)\s*(B|KB|MB|GB|TB)$").expect("regex"));
+        if self.lang == Lang::En {
+            return text.to_owned();
+        }
+        if let Some(captures) = SIZE.captures(text.trim()) {
+            let unit = match captures[2].to_uppercase().as_str() {
+                "B" => "o",
+                "KB" => "Ko",
+                "MB" => "Mo",
+                "GB" => "Go",
+                _ => "To",
+            };
+            return format!("{} {unit}", captures[1].replace('.', ","));
+        }
+        match text.trim().to_lowercase().as_str() {
+            "low usage" => "Utilisation faible".into(),
+            "medium usage" => "Utilisation moyenne".into(),
+            "high usage" => "Utilisation élevée".into(),
+            "extra high usage" => "Utilisation très élevée".into(),
+            _ => text.to_owned(),
+        }
+    }
+
+    /// Accepted inputs: `Text, Image input` → `Texte, image`.
+    pub fn site_input(&self, text: &str) -> String {
+        if self.lang == Lang::En {
+            return text.to_owned();
+        }
+        let list = text.trim().trim_end_matches(" input").trim_end_matches(" Input");
+        list.split(',')
+            .map(|item| match item.trim().to_lowercase().as_str() {
+                "text" => "texte".to_owned(),
+                "image" => "image".to_owned(),
+                "audio" => "audio".to_owned(),
+                "video" => "vidéo".to_owned(),
+                other => other.to_owned(),
+            })
+            .enumerate()
+            .map(|(index, item)| if index == 0 { capitalize(&item) } else { item })
+            .collect::<Vec<_>>()
+            .join(", ")
     }
 
     // Playground
@@ -362,5 +536,35 @@ impl Text {
 
     pub fn new_server(&self) -> String {
         self.pick("New Server", "Nouveau serveur")
+    }
+}
+
+fn capitalize(text: &str) -> String {
+    let mut chars = text.chars();
+    match chars.next() {
+        Some(first) => first.to_uppercase().chain(chars).collect(),
+        None => String::new(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn values_from_ollama_com_in_french() {
+        let fr = Text { lang: Lang::Fr };
+        assert_eq!(fr.site_date("2 weeks ago"), "il y a 2 semaines");
+        assert_eq!(fr.site_date("a month ago"), "il y a 1 mois");
+        assert_eq!(fr.site_date("11 months ago"), "il y a 11 mois");
+        assert_eq!(fr.site_date("1 year ago"), "il y a 1 an");
+        assert_eq!(fr.site_date("Updated recently"), "Updated recently");
+        assert_eq!(fr.site_size("5.2GB"), "5,2 Go");
+        assert_eq!(fr.site_size("Extra High Usage"), "Utilisation très élevée");
+        assert_eq!(fr.site_input("Text, Image input"), "Texte, image");
+        assert_eq!(fr.site_count("21.4M"), "21,4\u{202f}M");
+        let en = Text { lang: Lang::En };
+        assert_eq!(en.site_date("2 weeks ago"), "2 weeks ago");
+        assert_eq!(en.site_size("5.2GB"), "5.2GB");
     }
 }

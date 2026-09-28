@@ -10,6 +10,11 @@ component SidebarItem inherits Rectangle {
     in property <int> index;
     in property <int> badge;
     property <bool> selected: Api.section == index;
+    accessible-role: tab;
+    accessible-label: root.title;
+    accessible-item-selectable: true;
+    accessible-item-selected: root.selected;
+    accessible-action-default => { Api.section = root.index; }
     height: Theme.is-macos ? 30px : 36px;
     border-radius: Theme.control-radius;
     background: selected ? Theme.sidebar-selection : touch.has-hover ? Theme.hover : transparent;
@@ -51,7 +56,7 @@ component SidebarItem inherits Rectangle {
 component SectionTitle inherits Text {
     font-size: Theme.small-font-size;
     font-weight: 600;
-    color: Theme.text-tertiary;
+    color: Theme.text-secondary;
     height: 26px;
     vertical-alignment: bottom;
 }
@@ -79,6 +84,7 @@ component ServerStatus inherits Rectangle {
         MenuButton {
             icon: Icons.server;
             label: Api.server-name;
+            max-button-width: parent.width - 20px;
             for server in Api.servers: MenuEntry {
                 text: server.name;
                 checked: server.current;
@@ -93,7 +99,8 @@ component ServerStatus inherits Rectangle {
                 activated => { Api.section = 5; }
             }
         }
-        if Api.connection == 2: HorizontalLayout {
+        // Stacked: side by side, the French labels don't fit the sidebar.
+        if Api.connection == 2: VerticalLayout {
             spacing: 6px;
             if Api.can-start-ollama: Button {
                 text: @tr("Start Ollama");

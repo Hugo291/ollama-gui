@@ -181,7 +181,8 @@ impl RunningModel {
         } else if self.size_vram >= self.size {
             "100% GPU".into()
         } else {
-            let cpu = ((self.size - self.size_vram) as f64 / self.size as f64 * 100.0).round() as u64;
+            // Both parts are non-zero here: never round one of them down to 0 %.
+            let cpu = (((self.size - self.size_vram) as f64 / self.size as f64 * 100.0).round() as u64).clamp(1, 99);
             format!("{cpu}%/{}% CPU/GPU", 100 - cpu)
         }
     }

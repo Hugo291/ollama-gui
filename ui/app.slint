@@ -25,6 +25,12 @@ export component AppWindow inherits Window {
     background: Theme.window;
     default-font-size: Theme.font-size;
 
+    // Keyboard shortcuts of version 1: ⌘1…⌘6 pages, ⌘N pull, ⌘R refresh, ⇧⌘U check for
+    // updates, ⌘↩ chat, ⌘D duplicate, ⌘, settings (Ctrl on Windows; Slint reports ⌘ as control).
+    shortcuts := FocusScope {
+        capture-key-pressed(event) => { return root.shortcut(event); }
+        // Keys nothing else used: the model list keeps working after a dialog closed.
+        key-pressed(event) => { return root.navigation(event); }
     HorizontalLayout {
         Sidebar {
             width: 232px;
@@ -39,6 +45,75 @@ export component AppWindow inherits Window {
             if Api.section == 4: PlaygroundPage { }
             if Api.section == 5: SettingsPage { }
         }
+    }
+    }
+    init => { shortcuts.focus(); }
+    // A closed dialog, or a page left while one of its fields had the focus, takes the
+    // focus with it: give it back to the window, or shortcuts stop working.
+    property <int> dialog-open: Api.dialog;
+    changed dialog-open => {
+        if self.dialog-open == 0 {
+            shortcuts.focus();
+        }
+    }
+    property <int> current-section: Api.section;
+    changed current-section => {
+        // The Playground focuses its message box itself.
+        if self.current-section != 4 {
+            shortcuts.focus();
+        }
+    }
+
+    function navigation(event: KeyEvent) -> EventResult {
+        if Api.dialog != 0 || Api.section != 0 {
+            return reject;
+        }
+        if event.text == Key.UpArrow || event.text == Key.DownArrow {
+            Api.move-selection(event.text == Key.UpArrow ? -1 : 1);
+            return accept;
+        }
+        if (event.text == Key.Delete || (event.text == Key.Backspace && event.modifiers.control)) && Api.selected-model != "" {
+            Api.open-dialog(5, Api.selected-model);
+            return accept;
+        }
+        reject
+    }
+
+    function shortcut(event: KeyEvent) -> EventResult {
+        if !event.modifiers.control || Api.dialog != 0 {
+            return reject;
+        }
+        if event.text == "1" || event.text == "2" || event.text == "3" || event.text == "4" || event.text == "5" || event.text == "6" {
+            Api.section = event.text.to-float() - 1;
+            return accept;
+        }
+        if event.text == "," {
+            Api.section = 5;
+            return accept;
+        }
+        if event.text == "n" || event.text == "N" {
+            Api.open-dialog(1, "");
+            return accept;
+        }
+        if event.text == "r" || event.text == "R" {
+            Api.refresh();
+            return accept;
+        }
+        if (event.text == "u" || event.text == "U") && event.modifiers.shift {
+            Api.check-updates();
+            return accept;
+        }
+        if Api.section == 0 && Api.selected-model != "" {
+            if event.text == Key.Return && Api.detail.can-chat {
+                Api.chat-with(Api.selected-model);
+                return accept;
+            }
+            if event.text == "d" || event.text == "D" {
+                Api.open-dialog(2, Api.selected-model);
+                return accept;
+            }
+        }
+        reject
     }
     if Api.dialog != 0: Dialogs {
         width: parent.width;

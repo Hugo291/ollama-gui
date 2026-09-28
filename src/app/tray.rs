@@ -2,7 +2,7 @@
 
 use std::rc::Rc;
 
-use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
+use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
 use super::{App, chat};
 use crate::{Api, Tray, TrayModel};
@@ -78,8 +78,13 @@ pub fn sync(app: &Rc<App>) {
     let Some(tray) = tray_ref.as_ref() else { return };
     let ui = app.ui();
     let api = ui.global::<Api>();
-    tray.set_server(api.get_server_name());
-    tray.set_status(api.get_connection_text());
+    // Called every second while models are loaded: the native menu is only rebuilt when its content changes.
+    if tray.get_server() != api.get_server_name() {
+        tray.set_server(api.get_server_name());
+    }
+    if tray.get_status() != api.get_connection_text() {
+        tray.set_status(api.get_connection_text());
+    }
     let state = app.state.borrow();
     let models: Vec<TrayModel> = state
         .running
@@ -87,10 +92,20 @@ pub fn sync(app: &Rc<App>) {
         .map(|m| TrayModel {
             name: m.name.clone().into(),
             label: format!("{} — {}", m.name, app.text.bytes(m.size)).into(),
+            details: match m.expires_at.filter(|_| !m.stays_loaded()) {
+                Some(expires) => {
+                    format!("{} · {}", m.processor_label(), app.text.unloads_at(&expires.with_timezone(&chrono::Local).format("%H:%M").to_string()))
+                }
+                None => m.processor_label(),
+            }
+            .into(),
             can_chat: state.models.iter().any(|i| i.name == m.name && i.can_chat()),
         })
         .collect();
-    tray.set_models(ModelRc::new(VecModel::from(models)));
+    let current = tray.get_models();
+    if current.row_count() != models.len() || current.iter().zip(&models).any(|(a, b)| a != *b) {
+        tray.set_models(ModelRc::new(VecModel::from(models)));
+    }
     let downloads: Vec<SharedString> = app
         .downloads
         .borrow()
@@ -101,5 +116,8 @@ pub fn sync(app: &Rc<App>) {
             None => name.into(),
         })
         .collect();
-    tray.set_downloads(ModelRc::new(VecModel::from(downloads)));
+    let current = tray.get_downloads();
+    if current.row_count() != downloads.len() || current.iter().zip(&downloads).any(|(a, b)| a != *b) {
+        tray.set_downloads(ModelRc::new(VecModel::from(downloads)));
+    }
 }

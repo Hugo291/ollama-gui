@@ -48,6 +48,10 @@ export component Badge inherits Rectangle {
     border-radius: self.height / 2;
     background: tint.with-alpha(Theme.dark ? 0.24 : 0.13);
     label := Text {
+        // The badge's full height: accents on capitals (« À jour ») rise above the line.
+        y: 0;
+        height: parent.height;
+        vertical-alignment: center;
         text: root.text;
         color: Theme.dark ? tint.brighter(0.3) : tint.darker(0.1);
         font-size: Theme.small-font-size - 0.5px;
@@ -116,6 +120,10 @@ export component ToolButton inherits Rectangle {
     height: 28px;
     border-radius: Theme.control-radius;
     background: !enabled ? transparent : touch.pressed ? Theme.pressed : (touch.has-hover || active) ? Theme.hover : transparent;
+    accessible-role: button;
+    accessible-label: root.tooltip;
+    accessible-enabled: root.enabled;
+    accessible-action-default => { if root.enabled { root.clicked(); } }
     touch := TouchArea {
         enabled: root.enabled;
         clicked => { root.clicked(); }
@@ -168,6 +176,7 @@ export component SearchField inherits Rectangle {
         if root.text != "": ToolButton {
             icon: Icons.close;
             icon-size: 12px;
+            tooltip: @tr("Clear");
             width: 20px;
             height: 20px;
             y: (parent.height - self.height) / 2;
@@ -285,6 +294,12 @@ export component CodeDisclosure inherits VerticalLayout {
         TouchArea {
             clicked => { root.expanded = !root.expanded; }
         }
+        accessible-role: button;
+        accessible-label: root.title;
+        accessible-expandable: true;
+        accessible-expanded: root.expanded;
+        accessible-action-default => { root.expanded = !root.expanded; }
+        accessible-action-expand => { root.expanded = !root.expanded; }
     }
     if root.expanded: CodeBlock {
         text: root.text;
@@ -327,9 +342,21 @@ export component MenuButton inherits Rectangle {
     in property <string> label;
     in property <image> icon;
     in property <bool> enabled: true;
+    // Longer labels are shortened with "…" beyond this width.
+    in property <length> max-button-width: 10000px;
+    in property <string> tooltip;
     callback opened();
     height: 28px;
-    width: row.preferred-width + 16px;
+    width: min(row.preferred-width + 16px, root.max-button-width);
+    accessible-role: combobox;
+    accessible-label: root.label;
+    accessible-enabled: root.enabled;
+    accessible-action-default => {
+        if root.enabled {
+            root.opened();
+            popup.show();
+        }
+    }
     border-radius: Theme.control-radius;
     border-width: 1px;
     border-color: Theme.field-stroke;
@@ -347,6 +374,7 @@ export component MenuButton inherits Rectangle {
         Label {
             text: root.label;
             color: root.enabled ? Theme.text : Theme.text-tertiary;
+            horizontal-stretch: 1;
         }
         Icon {
             icon: Icons.chevron-down;
@@ -362,6 +390,7 @@ export component MenuButton inherits Rectangle {
             popup.show();
         }
     }
+    if root.tooltip != "": Tooltip { text: @markdown("\{root.tooltip}"); }
     popup := PopupWindow {
         x: 0;
         y: root.height + 4px;
@@ -388,6 +417,12 @@ export component MenuEntry inherits Rectangle {
     in property <bool> enabled: true;
     in property <color> text-color: Theme.text;
     callback activated();
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-enabled: root.enabled;
+    accessible-checkable: root.checked;
+    accessible-checked: root.checked;
+    accessible-action-default => { if root.enabled { root.activated(); } }
     height: 26px;
     min-width: 180px;
     // Long names (servers, models) are elided instead of widening the menu.

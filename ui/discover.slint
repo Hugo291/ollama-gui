@@ -20,6 +20,12 @@ export global LibraryFilters {
 component ResultRow inherits Rectangle {
     in property <LibraryRow> data;
     property <bool> selected: Api.library-selected == data.path;
+    accessible-role: list-item;
+    accessible-label: root.data.name;
+    accessible-description: root.data.summary;
+    accessible-item-selectable: true;
+    accessible-item-selected: root.selected;
+    accessible-action-default => { Api.select-library(root.data.path); }
     border-radius: Theme.radius;
     background: selected ? Theme.selection : touch.has-hover ? Theme.hover : transparent;
     touch := TouchArea {
@@ -79,12 +85,24 @@ component ResultRow inherits Rectangle {
 component TagAction inherits HorizontalLayout {
     in property <TagRow> data;
     alignment: end;
-    if root.data.state == 1: ProgressIndicator {
-        width: 64px;
-        height: 6px;
-        y: (parent.height - self.height) / 2;
-        indeterminate: root.data.progress < 0;
-        progress: max(root.data.progress, 0);
+    if root.data.state == 1: HorizontalLayout {
+        spacing: 4px;
+        ProgressIndicator {
+            width: 64px;
+            height: 6px;
+            y: (parent.height - self.height) / 2;
+            indeterminate: root.data.progress < 0;
+            progress: max(root.data.progress, 0);
+        }
+        ToolButton {
+            icon: Icons.stop;
+            icon-size: 13px;
+            width: 24px;
+            height: 22px;
+            y: (parent.height - self.height) / 2;
+            tooltip: @tr("Cancel");
+            clicked => { Api.cancel-pull(root.data.name); }
+        }
     }
     if root.data.state == 2: HorizontalLayout {
         spacing: 4px;
@@ -107,6 +125,9 @@ component TagAction inherits HorizontalLayout {
 }
 
 component TagsTable inherits VerticalLayout {
+    // In a narrow pane the least useful columns go first, so the Pull button stays visible.
+    property <bool> show-input: self.width >= 620px;
+    property <bool> show-context: self.width >= 460px;
     Rectangle {
         height: 28px;
         HorizontalLayout {
@@ -114,9 +135,9 @@ component TagsTable inherits VerticalLayout {
             padding-right: 24px;
             spacing: 8px;
             Label { text: @tr("Tag"); small: true; secondary: true; strong: true; horizontal-stretch: 1; }
-            Label { text: @tr("Size"); small: true; secondary: true; strong: true; width: 120px; }
-            Label { text: @tr("Context"); small: true; secondary: true; strong: true; width: 70px; }
-            Label { text: @tr("Input"); small: true; secondary: true; strong: true; width: 140px; }
+            Label { text: @tr("Size"); small: true; secondary: true; strong: true; width: 100px; }
+            if root.show-context: Label { text: @tr("Context"); small: true; secondary: true; strong: true; width: 70px; }
+            if root.show-input: Label { text: @tr("Input"); small: true; secondary: true; strong: true; width: 140px; }
             Rectangle { width: 100px; }
         }
     }
@@ -148,11 +169,11 @@ component TagsTable inherits VerticalLayout {
                 }
                 Label {
                     text: tag.size;
-                    width: 120px;
+                    width: 100px;
                     Tooltip { text: @markdown("\{tag.size}"); }
                 }
-                Label { text: tag.context; width: 70px; }
-                Label { text: tag.input; width: 140px; secondary: true; }
+                if root.show-context: Label { text: tag.context; width: 70px; }
+                if root.show-input: Label { text: tag.input; width: 140px; secondary: true; }
                 TagAction {
                     width: 100px;
                     data: tag;
@@ -167,8 +188,13 @@ component LibraryDetailPane inherits VerticalLayout {
         padding: 20px;
         padding-bottom: 12px;
         spacing: 8px;
+        // Wrapped text can report more height than it uses: keep the rows at their size,
+        // and leave the extra space to the tags below.
+        alignment: start;
+        vertical-stretch: 0;
         HorizontalLayout {
             spacing: 8px;
+            alignment: start;
             Text {
                 text: Api.library-detail.name;
                 font-size: Theme.font-size + 7px;
@@ -189,6 +215,9 @@ component LibraryDetailPane inherits VerticalLayout {
             color: Theme.text-secondary;
             font-size: Theme.font-size;
             wrap: word-wrap;
+            // At most four lines: wrapped text in a narrow pane reports too much height.
+            max-height: 4 * Theme.font-size * 1.35;
+            overflow: elide;
         }
         if Api.library-detail.stats != "": Label {
             text: Api.library-detail.stats;
@@ -284,7 +313,8 @@ export component DiscoverPage inherits VerticalLayout {
             }
         }
         SearchField {
-            width: 260px;
+            // Narrower in a small window, so the toolbar fits.
+            width: clamp(root.width - 560px, 150px, 260px);
             y: (parent.height - self.height) / 2;
             placeholder: @tr("Search models on ollama.com");
             text <=> Api.library-query;
@@ -295,7 +325,8 @@ export component DiscoverPage inherits VerticalLayout {
     HorizontalLayout {
         vertical-stretch: 1;
         Rectangle {
-            width: 380px;
+            // Narrower in a small window, leaving room for the tags.
+            width: clamp(root.width * 0.4, 280px, 380px);
             if Api.library-error != "": EmptyState {
                 icon: Icons.offline;
                 title: @tr("Can't Reach ollama.com");
@@ -322,6 +353,14 @@ export component DiscoverPage inherits VerticalLayout {
                 title: @tr("No Results");
             }
             if Api.library-results.length > 0: ListView {
+                // Near the end of the list: load the next page of results.
+                changed content-y => { self.load-more-if-needed(); }
+                changed content-height => { self.load-more-if-needed(); }
+                function load-more-if-needed() {
+                    if Api.library-has-more && !Api.library-loading-more && -self.content-y + self.visible-height > self.content-height - 240px {
+                        Api.library-load-more();
+                    }
+                }
                 for row in Api.library-results: VerticalLayout {
                     padding-left: 8px;
                     padding-right: 8px;
@@ -331,6 +370,13 @@ export component DiscoverPage inherits VerticalLayout {
                         data: row;
                     }
                 }
+            }
+            if Api.library-loading-more: Spinner {
+                x: (parent.width - self.width) / 2;
+                y: parent.height - self.height - 12px;
+                width: 18px;
+                height: 18px;
+                indeterminate: true;
             }
         }
         VDivider { }

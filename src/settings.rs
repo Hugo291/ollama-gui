@@ -71,26 +71,89 @@ pub fn new_id() -> String {
 pub fn default_local_server() -> Server {
     let address = std::env::var("OLLAMA_HOST")
         .ok()
-        .and_then(|host| parse_address(&host))
-        .map(|url| crate::api::client::display_url(&url))
+        .and_then(|host| crate::api::client::parse_ollama_host(&host))
+        .map(|url| crate::api::client::address_text(&url))
         .unwrap_or_else(|| DEFAULT_ADDRESS.to_owned());
     Server { id: new_id(), name: String::new(), address }
 }
 
 fn path() -> Option<PathBuf> {
+    // Debug builds: a separate settings file for tests (`OLLAMA_GUI_SETTINGS=/tmp/settings.json`).
+    #[cfg(debug_assertions)]
+    if let Some(path) = std::env::var_os("OLLAMA_GUI_SETTINGS") {
+        return Some(path.into());
+    }
     let dirs = directories::ProjectDirs::from("com", "hfc", "Ollama GUI")?;
     Some(dirs.config_dir().join("settings.json"))
 }
 
 impl Settings {
     pub fn load() -> Self {
-        let mut settings: Settings = path().and_then(|p| std::fs::read_to_string(p).ok()).and_then(|text| serde_json::from_str(&text).ok()).unwrap_or_default();
+        let path = path();
+        let text = path.as_ref().and_then(|p| std::fs::read_to_string(p).ok());
+        let mut settings = match text {
+            None => Settings::default(),
+            Some(text) => serde_json::from_str(&text).unwrap_or_else(|_| {
+                // A value of an unexpected type (edited by hand, newer version): keep what can be
+                // read, and a copy of the file, instead of losing the servers at the next save.
+                if let Some(path) = &path {
+                    let _ = std::fs::copy(path, path.with_extension("json.bak"));
+                }
+                Settings::lenient(&text)
+            }),
+        };
         settings.normalize();
+        settings
+    }
+
+    /// Reads each value on its own, ignoring the ones that don't have the expected type.
+    fn lenient(text: &str) -> Settings {
+        use serde_json::Value;
+        let mut settings = Settings::default();
+        let Ok(Value::Object(map)) = serde_json::from_str::<Value>(text) else { return settings };
+        let servers: Vec<Server> = map
+            .get("servers")
+            .and_then(Value::as_array)
+            .map(|servers| {
+                servers
+                    .iter()
+                    .filter_map(|server| {
+                        let address = server.get("address")?.as_str()?.to_owned();
+                        let id = server.get("id").and_then(Value::as_str).map_or_else(new_id, str::to_owned);
+                        let name = server.get("name").and_then(Value::as_str).unwrap_or_default().to_owned();
+                        Some(Server { id, name, address })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        if !servers.is_empty() {
+            settings.servers = servers;
+        }
+        if let Some(selected) = map.get("selected_server").and_then(Value::as_str) {
+            settings.selected_server = selected.to_owned();
+        }
+        let number = |key: &str| map.get(key).and_then(|v| v.as_u64().or_else(|| v.as_f64().map(|f| f as u64)));
+        if let Some(value) = number("keep_alive_seconds") {
+            settings.keep_alive_seconds = value;
+        }
+        if let Some(value) = number("refresh_seconds") {
+            settings.refresh_seconds = value;
+        }
+        if let Some(value) = number("theme") {
+            settings.theme = value as i32;
+        }
+        if let Some(value) = map.get("check_updates_on_launch").and_then(Value::as_bool) {
+            settings.check_updates_on_launch = value;
+        }
+        if let Some(value) = map.get("show_tray_icon").and_then(Value::as_bool) {
+            settings.show_tray_icon = value;
+        }
         settings
     }
 
     /// Repairs values edited by hand or saved by another version.
     pub fn normalize(&mut self) {
+        self.servers.retain(|server| parse_address(&server.address).is_some());
         if self.servers.is_empty() {
             self.servers.push(default_local_server());
         }
@@ -122,5 +185,32 @@ impl Settings {
 
     pub fn current_server(&self) -> &Server {
         self.servers.iter().find(|s| s.id == self.selected_server).unwrap_or(&self.servers[0])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lenient_reading_keeps_servers() {
+        let text = r#"{"servers":[{"id":"a","name":"Salon","address":"192.168.1.20"},{"address":"localhost:11434"},{"name":"broken"}],
+            "selected_server":"a","keep_alive_seconds":900.0,"theme":"dark","show_tray_icon":false}"#;
+        let mut settings = Settings::lenient(text);
+        settings.normalize();
+        assert_eq!(settings.servers.len(), 2);
+        assert_eq!(settings.servers[0].name, "Salon");
+        assert_eq!(settings.selected_server, "a");
+        assert_eq!(settings.keep_alive_seconds, 900);
+        assert_eq!(settings.theme, 0);
+        assert!(!settings.show_tray_icon);
+    }
+
+    #[test]
+    fn invalid_addresses_are_dropped() {
+        let mut settings = Settings::default();
+        settings.servers.push(Server { id: "x".into(), name: "Bad".into(), address: "ftp://nope".into() });
+        settings.normalize();
+        assert!(settings.servers.iter().all(|s| s.id != "x"));
     }
 }

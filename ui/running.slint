@@ -25,6 +25,7 @@ component Metric inherits VerticalLayout {
 export component LoadModelButton inherits MenuButton {
     icon: Icons.play;
     label: @tr("Load Model");
+    tooltip: Api.load-menu-tooltip;
     enabled: Api.connection == 1 && Api.loadable-models.length > 0;
     for name in Api.loadable-models: MenuEntry {
         text: name;
@@ -50,6 +51,9 @@ component RunningCard inherits Card {
                 Label {
                     text: root.data.name;
                     strong: true;
+                    // Shrinks (and elides) for long names, never grows past the text.
+                    horizontal-stretch: 1;
+                    max-width: self.preferred-width;
                 }
                 if root.data.detail != "": Label {
                     text: root.data.detail;
@@ -66,6 +70,7 @@ component RunningCard inherits Card {
             MenuButton {
                 icon: Icons.history;
                 label: @tr("Keep Loaded");
+                tooltip: @tr("Keep the model in memory for longer");
                 enabled: root.data.can-load;
                 y: (parent.height - self.height) / 2;
                 for label[index] in Api.keep-alive-labels: MenuEntry {
@@ -155,9 +160,18 @@ export component RunningPage inherits VerticalLayout {
                                 secondary: true;
                             }
                         }
-                        ProgressIndicator {
+                        Rectangle {
                             height: 6px;
-                            progress: Api.memory-share;
+                            border-radius: 3px;
+                            background: Theme.divider;
+                            Rectangle {
+                                x: 0;
+                                width: parent.width * clamp(Api.memory-share, 0, 1);
+                                height: parent.height;
+                                border-radius: 3px;
+                                // Orange when memory runs short.
+                                background: Api.memory-share > 0.8 ? Theme.orange : Theme.accent;
+                            }
                         }
                     }
                 }

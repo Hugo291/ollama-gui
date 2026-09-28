@@ -24,6 +24,9 @@ component DownloadCard inherits Card {
                 Label {
                     text: root.data.name;
                     strong: true;
+                    // Shrinks (and elides) for long names, never grows past the text.
+                    horizontal-stretch: 1;
+                    max-width: self.preferred-width;
                 }
                 if root.data.server != "": Label {
                     text: root.data.server;

@@ -24,6 +24,10 @@ component HeaderCell inherits Rectangle {
     in property <string> title;
     in property <int> column: -1;
     property <bool> sorted: column >= 0 && Api.sort-column == column;
+    accessible-role: button;
+    accessible-enabled: root.column >= 0;
+    accessible-label: root.title;
+    accessible-action-default => { root.sort(); }
     background: touch.has-hover && column >= 0 ? Theme.hover : transparent;
     HorizontalLayout {
         padding-left: 8px;
@@ -46,15 +50,20 @@ component HeaderCell inherits Rectangle {
     }
     touch := TouchArea {
         enabled: root.column >= 0;
-        clicked => {
-            if Api.sort-column == root.column {
-                Api.sort-ascending = !Api.sort-ascending;
-            } else {
-                Api.sort-column = root.column;
-                Api.sort-ascending = root.column == 0;
-            }
-            Api.models-query-changed();
+        clicked => { root.sort(); }
+    }
+
+    function sort() {
+        if root.column < 0 {
+            return;
         }
+        if Api.sort-column == root.column {
+            Api.sort-ascending = !Api.sort-ascending;
+        } else {
+            Api.sort-column = root.column;
+            Api.sort-ascending = root.column == 0;
+        }
+        Api.models-query-changed();
     }
 }
 
@@ -78,6 +87,13 @@ component ModelTableRow inherits Rectangle {
     in property <bool> compact;
     property <bool> selected: Api.selected-model == data.name;
     callback clicked();
+    accessible-role: list-item;
+    accessible-label: root.data.name;
+    accessible-description: root.data.parameters + " " + root.data.size;
+    accessible-item-selectable: true;
+    accessible-item-selected: root.selected;
+    accessible-item-index: root.index;
+    accessible-action-default => { root.clicked(); }
     height: 32px;
     background: selected ? Theme.selection : touch.has-hover ? Theme.hover : Math.mod(index, 2) == 1 ? Theme.zebra : transparent;
     ContextMenuArea {
@@ -211,7 +227,8 @@ component ModelTableRow inherits Rectangle {
 }
 
 component ModelTable inherits Rectangle {
-    property <bool> compact: self.width < 640px;
+    // The full table needs about 700 px; below, Quantization and Modified are hidden.
+    property <bool> compact: self.width < 700px;
     border-radius: Theme.radius;
     border-width: 1px;
     border-color: Theme.card-stroke;
@@ -220,7 +237,8 @@ component ModelTable inherits Rectangle {
     forward-focus: keys;
     keys := FocusScope {
         key-pressed(event) => {
-            if event.text == Key.Delete || (event.text == Key.Backspace && event.modifiers.meta) {
+            // Delete, or ⌘⌫ on macOS (Slint reports ⌘ as `control`) and Ctrl+Backspace on Windows.
+            if event.text == Key.Delete || (event.text == Key.Backspace && event.modifiers.control) {
                 if Api.selected-model != "" {
                     Api.open-dialog(5, Api.selected-model);
                     return accept;
@@ -247,6 +265,18 @@ component ModelTable inherits Rectangle {
             }
             Divider { }
             ListView {
+                // Keyboard moves and "Show in Models" keep the selected row in view (rows are 32 px).
+                property <int> selected-index: Api.selected-index;
+                changed selected-index => {
+                    if self.selected-index < 0 {
+                        return;
+                    }
+                    if self.selected-index * 32px < -self.content-y {
+                        self.content-y = -self.selected-index * 32px;
+                    } else if (self.selected-index + 1) * 32px > -self.content-y + self.visible-height {
+                        self.content-y = self.visible-height - (self.selected-index + 1) * 32px;
+                    }
+                }
                 for row[index] in Api.models: ModelTableRow {
                     data: row;
                     index: index;
@@ -504,6 +534,13 @@ export component ModelsPage inherits VerticalLayout {
         vertical-stretch: 1;
         Rectangle {
             horizontal-stretch: 1;
+            if Api.connection == 1 && !Api.models-loaded: Spinner {
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                width: 24px;
+                height: 24px;
+                indeterminate: true;
+            }
             if Api.connection != 1 && Api.models-count == 0: EmptyState {
                 icon: Api.connection == 2 ? Icons.offline : Icons.server;
                 title: Api.connection == 2 ? @tr("Ollama Is Not Reachable") : @tr("Connecting…");
@@ -538,8 +575,9 @@ export component ModelsPage inherits VerticalLayout {
                 height: parent.height - 24px;
             }
         }
-        if root.show-inspector: VDivider { }
-        if root.show-inspector: Rectangle {
+        // Hidden in a narrow window, where the table would be too narrow to read.
+        if root.show-inspector && root.width >= 880px: VDivider { }
+        if root.show-inspector && root.width >= 880px: Rectangle {
             width: 360px;
             if Api.has-detail: DetailsPane { }
             if !Api.has-detail: EmptyState {

@@ -80,6 +80,14 @@ pub struct App {
     total_memory: u64,
     last_section: Cell<i32>,
     tray: RefCell<Option<Tray>>,
+    /// Increments each time a dialog opens: a late result only touches the dialog it came from.
+    dialog_token: Cell<u64>,
+    /// Base model whose system prompt the Customize dialog is waiting for.
+    customize_base: RefCell<String>,
+    /// Set while "Start Ollama" waits for the server to answer.
+    starting_ollama: Cell<bool>,
+    /// Whether Palette.color-scheme was overridden (light or dark chosen at least once).
+    palette_forced: Cell<bool>,
     /// Sections of the model shown in the inspector, kept while it stays the same
     /// so expanded sections stay expanded.
     detail_sections: RefCell<Option<(String, ModelRc<DetailSection>)>>,
@@ -101,6 +109,83 @@ fn update_rows<T: Clone + 'static>(current: ModelRc<T>, rows: Vec<T>, same: impl
         model.set_vec(rows);
     }
     None
+}
+
+/// Like `update_rows`, for lists whose rows keep their order and are added or removed one
+/// at a time: rows are matched by key, so the other rows keep their instances.
+fn update_keyed_rows<T: Clone + PartialEq + 'static, K: PartialEq>(current: ModelRc<T>, rows: Vec<T>, key: impl Fn(&T) -> K) -> Option<ModelRc<T>> {
+    let Some(model) = current.as_any().downcast_ref::<VecModel<T>>() else {
+        return Some(ModelRc::new(VecModel::from(rows)));
+    };
+    let mut index = 0;
+    while index < model.row_count() {
+        let gone = model.row_data(index).is_none_or(|old| !rows.iter().any(|row| key(row) == key(&old)));
+        if gone {
+            model.remove(index);
+        } else {
+            index += 1;
+        }
+    }
+    // The remaining rows must keep their order; otherwise replace the whole list.
+    let mut position = 0;
+    let in_order = model.iter().all(|old| match rows[position..].iter().position(|row| key(row) == key(&old)) {
+        Some(offset) => {
+            position += offset + 1;
+            true
+        }
+        None => false,
+    });
+    if !in_order {
+        model.set_vec(rows);
+        return None;
+    }
+    for (index, row) in rows.into_iter().enumerate() {
+        match model.row_data(index) {
+            Some(old) if key(&old) == key(&row) => {
+                if old != row {
+                    model.set_row_data(index, row);
+                }
+            }
+            _ => model.insert(index, row),
+        }
+    }
+    None
+}
+
+/// Case-insensitive order where numbers compare by value: `qwen3:8b` < `qwen3:14b`.
+fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
+    let (mut a, mut b) = (a.chars().peekable(), b.chars().peekable());
+    loop {
+        match (a.peek().copied(), b.peek().copied()) {
+            (None, None) => return Ordering::Equal,
+            (None, Some(_)) => return Ordering::Less,
+            (Some(_), None) => return Ordering::Greater,
+            (Some(x), Some(y)) if x.is_ascii_digit() && y.is_ascii_digit() => {
+                let number = |chars: &mut std::iter::Peekable<std::str::Chars>| {
+                    let mut digits = String::new();
+                    while let Some(c) = chars.peek().copied().filter(char::is_ascii_digit) {
+                        digits.push(c);
+                        chars.next();
+                    }
+                    digits.trim_start_matches('0').to_owned()
+                };
+                let (left, right) = (number(&mut a), number(&mut b));
+                let order = left.len().cmp(&right.len()).then_with(|| left.cmp(&right));
+                if order != Ordering::Equal {
+                    return order;
+                }
+            }
+            (Some(x), Some(y)) => {
+                let order = x.to_lowercase().cmp(y.to_lowercase());
+                if order != Ordering::Equal {
+                    return order;
+                }
+                a.next();
+                b.next();
+            }
+        }
+    }
 }
 
 /// Compares string models by content (models compare by identity).
@@ -158,6 +243,10 @@ impl App {
             total_memory,
             last_section: Cell::new(-1),
             tray: RefCell::new(None),
+            dialog_token: Cell::new(0),
+            customize_base: RefCell::new(String::new()),
+            starting_ollama: Cell::new(false),
+            palette_forced: Cell::new(false),
             detail_sections: RefCell::new(None),
         })
     }
@@ -230,6 +319,15 @@ impl App {
             }
         });
         self.restart_refresh_timer();
+        {
+            // The window frame takes a forced theme once the window exists.
+            let app = Rc::downgrade(self);
+            slint::Timer::single_shot(Duration::ZERO, move || {
+                if let Some(app) = app.upgrade() {
+                    app.apply_theme();
+                }
+            });
+        }
         #[cfg(target_os = "macos")]
         {
             // Once the event loop runs: a click on the Dock icon reopens a closed window.
@@ -260,6 +358,7 @@ impl App {
     }
 
     fn every_second(self: &Rc<Self>) {
+        self.sync_system_theme();
         // Unload countdowns and relative dates move with time.
         if !self.state.borrow().running.is_empty() {
             self.sync_running();
@@ -319,7 +418,8 @@ impl App {
             Some(Err(error)) => {
                 {
                     let mut state = self.state.borrow_mut();
-                    state.connection = Connection::Unreachable(error.to_string());
+                    // While Ollama is starting, refusing connections is expected: keep showing "Connecting…".
+                    state.connection = if self.starting_ollama.get() { Connection::Connecting } else { Connection::Unreachable(self.text.api_error(&error)) };
                     state.running.clear();
                 }
                 self.sync_connection();
@@ -342,11 +442,16 @@ impl App {
         if self.state.borrow().server_generation != generation {
             return;
         }
-        models.sort_by_key(|m| m.name.to_lowercase());
+        models.sort_by(|a, b| natural_cmp(&a.name, &b.name));
         {
             let mut state = self.state.borrow_mut();
             let names: HashSet<&str> = models.iter().map(|m| m.name.as_str()).collect();
             state.updates.retain(|name, _| names.contains(name.as_str()));
+            // Details of models that are gone or were updated (new digest) can't be shown again.
+            let keys: HashSet<String> = models.iter().map(|m| format!("{}@{}", m.name, m.digest)).collect();
+            state.details.retain(|key, _| keys.contains(key));
+            // A failed detail load is tried again with the next refresh.
+            state.detail_errors.clear();
             state.models = models;
             state.models_loaded = true;
         }
@@ -373,7 +478,7 @@ impl App {
         if self.state.borrow().server_generation != generation {
             return;
         }
-        running.sort_by_key(|m| m.name.to_lowercase());
+        running.sort_by(|a, b| natural_cmp(&a.name, &b.name));
         let changed = self.state.borrow().running != running;
         self.state.borrow_mut().running = running;
         if changed {
@@ -409,6 +514,9 @@ impl App {
             state.updates.clear();
             state.details.clear();
             state.detail_errors.clear();
+            state.detail_loading.clear();
+            state.busy.clear();
+            state.checking_updates = false;
             state.launch_check_done = false;
             state.refreshing = false;
         }
@@ -471,9 +579,10 @@ impl App {
                 current: server.id == state.settings.selected_server,
             })
             .collect();
-        let model = ModelRc::new(VecModel::from(items));
-        api.set_servers(model.clone());
-        api.set_server_list(model);
+        if let Some(model) = update_keyed_rows(api.get_server_list(), items, |server| server.id.clone()) {
+            api.set_servers(model.clone());
+            api.set_server_list(model);
+        }
     }
 
     fn model_kind(model: &OllamaModel) -> i32 {
@@ -533,7 +642,7 @@ impl App {
                 2 => a.quantization().unwrap_or_default().cmp(&b.quantization().unwrap_or_default()),
                 3 => (if a.is_cloud() { 0 } else { a.size + 1 }).cmp(&(if b.is_cloud() { 0 } else { b.size + 1 })),
                 4 => a.modified_at.cmp(&b.modified_at),
-                _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+                _ => natural_cmp(&a.name, &b.name),
             };
             if ascending { ordering } else { ordering.reverse() }
         });
@@ -588,9 +697,23 @@ impl App {
             String::new()
         };
         api.set_models_subtitle(subtitle.into());
+        self.sync_selected_index();
+    }
+
+    /// Row of the selected model in the list, so the interface can keep it in view.
+    fn sync_selected_index(&self) {
+        let ui = self.ui();
+        let api = ui.global::<Api>();
+        let selected = api.get_selected_model();
+        let rows = api.get_models();
+        let index = (0..rows.row_count()).find(|&i| rows.row_data(i).is_some_and(|row| row.name == selected)).map_or(-1, |i| i as i32);
+        if api.get_selected_index() != index {
+            api.set_selected_index(index);
+        }
     }
 
     fn sync_detail(self: &Rc<Self>) {
+        self.sync_selected_index();
         let ui = self.ui();
         let api = ui.global::<Api>();
         let selected = api.get_selected_model().to_string();
@@ -748,7 +871,7 @@ impl App {
                         state.details.insert(key, info);
                     }
                     Some(Err(error)) => {
-                        state.detail_errors.insert(key, error.to_string());
+                        state.detail_errors.insert(key, app.text.api_error(&error));
                     }
                     None => {}
                 }
@@ -812,7 +935,10 @@ impl App {
         }
         let loadable: Vec<SharedString> =
             state.models.iter().filter(|m| m.can_load() && !Self::is_running(&state, &m.name)).map(|m| m.name.clone().into()).collect();
-        api.set_loadable_models(ModelRc::new(VecModel::from(loadable)));
+        // This runs every second while models are loaded: replacing the list would rebuild an open menu.
+        if !same_strings(&api.get_loadable_models(), &ModelRc::new(VecModel::from(loadable.clone()))) {
+            api.set_loadable_models(ModelRc::new(VecModel::from(loadable)));
+        }
         drop(state);
         tray::sync(self);
     }
@@ -958,29 +1084,40 @@ impl App {
             }
             (state.client.clone(), keep_alive.unwrap_or(state.settings.keep_alive_seconds), model.supports(capability::EMBEDDING))
         };
+        let generation = self.state.borrow().server_generation;
         self.set_busy(&name, true);
         let app = self.clone();
         self.spawn(async move {
             let task_name = name.clone();
             let result = app.io(async move { client.load(&task_name, keep_alive, is_embedding).await }).await;
+            // Another server is shown now: this result is about the previous one.
+            if app.state.borrow().server_generation != generation {
+                return;
+            }
             app.set_busy(&name, false);
             if let Some(Err(error)) = result {
-                app.toast(app.text.could_not_load(&name), error.to_string());
+                app.toast(app.text.could_not_load(&name), app.text.api_error(&error));
             }
             app.refresh_running().await;
         });
     }
 
     fn unload(self: &Rc<Self>, name: String) {
-        let client = self.state.borrow().client.clone();
+        let (client, generation) = {
+            let state = self.state.borrow();
+            (state.client.clone(), state.server_generation)
+        };
         self.set_busy(&name, true);
         let app = self.clone();
         self.spawn(async move {
             let task_name = name.clone();
             let result = app.io(async move { client.unload(&task_name).await }).await;
+            if app.state.borrow().server_generation != generation {
+                return;
+            }
             app.set_busy(&name, false);
             if let Some(Err(error)) = result {
-                app.toast(app.text.could_not_unload(&name), error.to_string());
+                app.toast(app.text.could_not_unload(&name), app.text.api_error(&error));
             }
             app.refresh_running().await;
         });
@@ -1027,6 +1164,7 @@ impl App {
             }
             candidates
         };
+        let checked: HashMap<String, String> = candidates.iter().map(|m| (m.name.clone(), m.digest.clone())).collect();
         self.sync_models();
         self.sync_detail();
         let generation = self.state.borrow().server_generation;
@@ -1047,10 +1185,17 @@ impl App {
             .unwrap_or_default();
         {
             let mut state = self.state.borrow_mut();
+            if state.server_generation != generation {
+                return;
+            }
             state.checking_updates = false;
-            if state.server_generation == generation {
-                for (name, status) in results {
+            for (name, status) in results {
+                // Deleted or updated meanwhile: the result is about another version.
+                let current = state.models.iter().any(|m| m.name == name && checked.get(&name) == Some(&m.digest));
+                if current {
                     state.updates.insert(name, status);
+                } else {
+                    state.updates.remove(&name);
                 }
             }
             state.updates.retain(|_, status| *status != UpdateStatus::Checking);
@@ -1153,6 +1298,7 @@ impl App {
     fn open_dialog(self: &Rc<Self>, kind: i32, target: String) {
         let ui = self.ui();
         let api = ui.global::<Api>();
+        self.dialog_token.set(self.dialog_token.get() + 1);
         api.set_dialog_error(SharedString::new());
         api.set_dialog_status(SharedString::new());
         api.set_dialog_busy(false);
@@ -1166,7 +1312,13 @@ impl App {
                     self.state.borrow().models.iter().filter(|m| !m.is_cloud() && m.can_chat()).map(|m| m.name.clone().into()).collect();
                 api.set_base_models(ModelRc::new(VecModel::from(base_models)));
                 let repository = ModelReference::parse(&target).map(|r| r.repository).unwrap_or_else(|| "model".into());
-                api.set_dialog_suggestion(format!("{repository}-custom:latest").into());
+                // A free name: customizing the same model twice must not replace the first one.
+                let taken: HashSet<String> = self.state.borrow().models.iter().map(|m| canonical(&m.name)).collect();
+                let suggestion = (1..)
+                    .map(|n| if n == 1 { format!("{repository}-custom:latest") } else { format!("{repository}-custom-{n}:latest") })
+                    .find(|name| !taken.contains(&canonical(name)))
+                    .unwrap_or_default();
+                api.set_dialog_suggestion(suggestion.into());
                 api.set_customize_system(SharedString::new());
                 self.prefill_system_prompt(target.clone());
             }
@@ -1182,23 +1334,31 @@ impl App {
     }
 
     fn prefill_system_prompt(self: &Rc<Self>, base: String) {
+        *self.customize_base.borrow_mut() = base.clone();
         let Some(model) = self.state.borrow().models.iter().find(|m| m.name == base).cloned() else { return };
         let key = format!("{}@{}", model.name, model.digest);
         if let Some(info) = self.state.borrow().details.get(&key) {
             self.ui().global::<Api>().set_customize_system(info.system.clone().unwrap_or_default().into());
             return;
         }
-        let client = self.state.borrow().client.clone();
+        let (client, generation) = {
+            let state = self.state.borrow();
+            (state.client.clone(), state.server_generation)
+        };
+        let token = self.dialog_token.get();
         let app = self.clone();
         self.spawn(async move {
-            if let Some(Ok(info)) = app.io(async move { client.show(&model.name).await }).await {
-                let ui = app.ui();
-                let api = ui.global::<Api>();
-                if api.get_dialog() == 4 {
-                    api.set_customize_system(info.system.clone().unwrap_or_default().into());
-                }
-                app.state.borrow_mut().details.insert(key, info);
+            let Some(Ok(info)) = app.io(async move { client.show(&model.name).await }).await else { return };
+            if app.state.borrow().server_generation != generation {
+                return;
             }
+            // Only into the same dialog, still waiting for this base model.
+            let ui = app.ui();
+            let api = ui.global::<Api>();
+            if api.get_dialog() == 4 && app.dialog_token.get() == token && *app.customize_base.borrow() == base {
+                api.set_customize_system(info.system.clone().unwrap_or_default().into());
+            }
+            app.state.borrow_mut().details.insert(key, info);
         });
     }
 
@@ -1208,6 +1368,7 @@ impl App {
             (state.client.clone(), state.server_generation)
         };
         let kind = if rename { 3 } else { 2 };
+        let token = self.dialog_token.get();
         let ui = self.ui();
         let api = ui.global::<Api>();
         api.set_dialog_busy(true);
@@ -1227,12 +1388,14 @@ impl App {
                 .await;
             let ui = app.ui();
             let api = ui.global::<Api>();
-            api.set_dialog_busy(false);
-            // The server changed meanwhile, or the dialog was closed: nothing to show.
+            // The dialog this came from, if it is still open (not closed, not replaced by another one).
+            let dialog_open = api.get_dialog() == kind && app.dialog_token.get() == token;
+            if dialog_open {
+                api.set_dialog_busy(false);
+            }
             if app.state.borrow().server_generation != generation {
                 return;
             }
-            let dialog_open = api.get_dialog() == kind && api.get_dialog_target() == source.as_str();
             match result {
                 Some(Ok(())) => {
                     if dialog_open {
@@ -1241,8 +1404,8 @@ impl App {
                     app.refresh_models().await;
                     app.reveal(&destination);
                 }
-                Some(Err(error)) if dialog_open => api.set_dialog_error(error.to_string().into()),
-                Some(Err(error)) => app.toast(app.text.could_not_copy(&source), error.to_string()),
+                Some(Err(error)) if dialog_open => api.set_dialog_error(app.text.api_error(&error).into()),
+                Some(Err(error)) => app.toast(app.text.could_not_copy(&source), app.text.api_error(&error)),
                 None => {}
             }
         });
@@ -1276,7 +1439,7 @@ impl App {
                         api.set_selected_model(SharedString::new());
                     }
                 }
-                Some(Err(error)) => app.toast(app.text.could_not_delete(&name), error.to_string()),
+                Some(Err(error)) => app.toast(app.text.could_not_delete(&name), app.text.api_error(&error)),
                 None => {}
             }
             app.refresh_models().await;
@@ -1289,6 +1452,7 @@ impl App {
             let state = self.state.borrow();
             (state.client.clone(), state.server_generation)
         };
+        let token = self.dialog_token.get();
         let ui = self.ui();
         let api = ui.global::<Api>();
         api.set_dialog_busy(true);
@@ -1308,24 +1472,26 @@ impl App {
                             succeeded |= status == "success";
                             let ui = app.ui();
                             let api = ui.global::<Api>();
-                            if api.get_dialog() == 4 {
+                            if api.get_dialog() == 4 && app.dialog_token.get() == token {
                                 api.set_dialog_status(app.text.progress_status(&status).into());
                             }
                         }
                     }
                     Err(error) => {
-                        failure = Some(error.to_string());
+                        failure = Some(app.text.api_error(&error));
                         break;
                     }
                 }
             }
             let ui = app.ui();
             let api = ui.global::<Api>();
-            api.set_dialog_busy(false);
+            let dialog_open = api.get_dialog() == 4 && app.dialog_token.get() == token;
+            if dialog_open {
+                api.set_dialog_busy(false);
+            }
             if app.state.borrow().server_generation != generation {
                 return;
             }
-            let dialog_open = api.get_dialog() == 4;
             if succeeded {
                 if dialog_open {
                     api.set_dialog(0);
@@ -1380,18 +1546,58 @@ impl App {
         let keep_alive_short: Vec<SharedString> = KEEP_ALIVE_CHOICES.iter().map(|s| self.text.keep_alive_label(*s).into()).collect();
         api.set_keep_alive_labels(ModelRc::new(VecModel::from(keep_alive_short)));
         api.set_keep_alive_index(KEEP_ALIVE_CHOICES.iter().position(|s| *s == settings.keep_alive_seconds).unwrap_or(1) as i32);
+        api.set_load_menu_tooltip(self.text.load_menu_tooltip(settings.keep_alive_seconds).into());
         let refresh: Vec<SharedString> = REFRESH_CHOICES.iter().map(|s| self.text.refresh_label(*s).into()).collect();
         api.set_refresh_labels(ModelRc::new(VecModel::from(refresh)));
         api.set_refresh_index(REFRESH_CHOICES.iter().position(|s| *s == settings.refresh_seconds).unwrap_or(1) as i32);
         api.set_check_updates_at_launch(settings.check_updates_on_launch);
         api.set_theme_index(settings.theme);
         api.set_show_tray_icon(settings.show_tray_icon);
-        let scheme = match settings.theme {
-            1 => slint::language::ColorScheme::Light,
-            2 => slint::language::ColorScheme::Dark,
-            _ => slint::language::ColorScheme::Unknown,
+        drop(state);
+        self.apply_theme();
+    }
+
+    /// Light, dark or the system appearance: for the app's colors, the standard widgets and the window frame.
+    fn apply_theme(&self) {
+        use slint::language::ColorScheme;
+        use slint::winit_030::{WinitWindowAccessor, winit::window::Theme as WindowTheme};
+        let ui = self.ui();
+        let theme = self.state.borrow().settings.theme;
+        let palette = ui.global::<Palette>();
+        match theme {
+            1 | 2 => {
+                palette.set_color_scheme(if theme == 1 { ColorScheme::Light } else { ColorScheme::Dark });
+                self.palette_forced.set(true);
+            }
+            // Until then, Palette.color-scheme is bound to the system scheme: leave it alone.
+            _ if self.palette_forced.get() => {
+                // The binding is gone: the widgets follow the system through `unknown`,
+                // the app's colors through Theme.system-dark.
+                palette.set_color_scheme(ColorScheme::Unknown);
+                self.sync_system_theme();
+            }
+            _ => {}
+        }
+        let window_theme = match theme {
+            1 => Some(WindowTheme::Light),
+            2 => Some(WindowTheme::Dark),
+            _ => None,
         };
-        ui.global::<Palette>().set_color_scheme(scheme);
+        ui.window().with_winit_window(|window| window.set_theme(window_theme));
+    }
+
+    /// "System" after a forced theme: the app's colors follow the system appearance (checked every second).
+    fn sync_system_theme(&self) {
+        use slint::winit_030::{WinitWindowAccessor, winit::window::Theme as WindowTheme};
+        if !self.palette_forced.get() || self.state.borrow().settings.theme != 0 {
+            return;
+        }
+        let ui = self.ui();
+        let dark = ui.window().with_winit_window(|window| window.theme() == Some(WindowTheme::Dark)).unwrap_or(false);
+        let theme = ui.global::<Theme>();
+        if theme.get_system_dark() != dark {
+            theme.set_system_dark(dark);
+        }
     }
 
     fn bind_settings(self: &Rc<Self>, api: &Api) {
@@ -1426,12 +1632,14 @@ impl App {
             let app = Rc::downgrade(self);
             move || {
                 let Some(app) = app.upgrade() else { return };
+                let id = crate::settings::new_id();
                 {
                     let mut state = app.state.borrow_mut();
-                    let server = Server { id: crate::settings::new_id(), name: app.text.new_server(), address: "http://192.168.1.20:11434".into() };
+                    let server = Server { id: id.clone(), name: app.text.new_server(), address: "http://192.168.1.20:11434".into() };
                     state.settings.servers.push(server);
                     state.settings.save();
                 }
+                app.ui().global::<Api>().set_new_server_id(id.into());
                 app.sync_servers();
             }
         });
@@ -1480,6 +1688,7 @@ impl App {
                 }
             }
         });
+        api.on_address_is_valid(|address| parse_address(&address).is_some());
         api.on_address_preview({
             let app = Rc::downgrade(self);
             move |address| {
@@ -1502,6 +1711,7 @@ impl App {
                     return;
                 };
                 api.set_testing(true);
+                api.set_test_address(address.clone());
                 api.set_test_result(SharedString::new());
                 let task = app.clone();
                 app.spawn(async move {
@@ -1517,7 +1727,7 @@ impl App {
                         }
                         Some(Err(error)) => {
                             api.set_test_ok(false);
-                            api.set_test_result(error.to_string().into());
+                            api.set_test_result(task.text.api_error(&error).into());
                         }
                         None => api.set_testing(false),
                     }
@@ -1529,11 +1739,16 @@ impl App {
     // MARK: Local Ollama
 
     fn start_local_ollama(self: &Rc<Self>) {
+        // One launch at a time: more clicks while it starts would start more servers.
+        if self.starting_ollama.get() {
+            return;
+        }
         let Some(launcher) = ollama_launcher() else { return };
         if let Err(error) = launcher.start() {
             self.toast(self.text.could_not_start(), error.to_string());
             return;
         }
+        self.starting_ollama.set(true);
         self.state.borrow_mut().connection = Connection::Connecting;
         self.sync_connection();
         let app = self.clone();
@@ -1545,6 +1760,9 @@ impl App {
                     break;
                 }
             }
+            // Still not answering after 20 s: the next refresh shows why.
+            app.starting_ollama.set(false);
+            app.clone().refresh(true).await;
         });
     }
 }
@@ -1581,12 +1799,17 @@ enum Launcher {
 impl Launcher {
     fn start(&self) -> std::io::Result<()> {
         use std::process::{Command, Stdio};
-        match self {
+        let mut child = match self {
             #[cfg(target_os = "macos")]
-            Launcher::MacApp => Command::new("open").args(["-g", "-a", "Ollama"]).spawn().map(|_| ()),
-            Launcher::App(path) => Command::new(path).stdout(Stdio::null()).stderr(Stdio::null()).spawn().map(|_| ()),
-            Launcher::Serve(path) => Command::new(path).arg("serve").stdout(Stdio::null()).stderr(Stdio::null()).spawn().map(|_| ()),
-        }
+            Launcher::MacApp => Command::new("open").args(["-g", "-a", "Ollama"]).spawn()?,
+            Launcher::App(path) => Command::new(path).stdout(Stdio::null()).stderr(Stdio::null()).spawn()?,
+            Launcher::Serve(path) => Command::new(path).arg("serve").stdout(Stdio::null()).stderr(Stdio::null()).spawn()?,
+        };
+        // Reap the process when it exits, so it doesn't linger as a zombie.
+        std::thread::spawn(move || {
+            let _ = child.wait();
+        });
+        Ok(())
     }
 }
 
@@ -1624,4 +1847,27 @@ fn ollama_launcher() -> Option<Launcher> {
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::natural_cmp;
+
+    #[test]
+    fn keyed_rows_keep_order() {
+        use slint::{Model, ModelRc, VecModel};
+        let model = ModelRc::new(VecModel::from(vec!["a", "b", "c"]));
+        assert!(super::update_keyed_rows(model.clone(), vec!["a", "c", "d"], |s| *s).is_none());
+        assert_eq!(model.iter().collect::<Vec<_>>(), ["a", "c", "d"]);
+        // Reordered: the list is replaced instead of duplicating rows.
+        assert!(super::update_keyed_rows(model.clone(), vec!["d", "a"], |s| *s).is_none());
+        assert_eq!(model.iter().collect::<Vec<_>>(), ["d", "a"]);
+    }
+
+    #[test]
+    fn natural_order() {
+        let mut names = vec!["qwen3:14b", "Qwen3:8b", "qwen3:0.6b", "gemma3:27b", "gemma3:4b", "qwen3:8b-q8_0"];
+        names.sort_by(|a, b| natural_cmp(a, b));
+        assert_eq!(names, ["gemma3:4b", "gemma3:27b", "qwen3:0.6b", "Qwen3:8b", "qwen3:8b-q8_0", "qwen3:14b"]);
+    }
 }

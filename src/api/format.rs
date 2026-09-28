@@ -23,17 +23,22 @@ pub fn bytes(value: u64, lang: Lang) -> String {
         Lang::En => ["B", "KB", "MB", "GB", "TB"],
         Lang::Fr => ["o", "Ko", "Mo", "Go", "To"],
     };
-    let mut size = value as f64;
-    let mut unit = 0;
-    while size >= 1000.0 && unit < units.len() - 1 {
-        size /= 1000.0;
-        unit += 1;
-    }
-    let digits = match unit {
+    let digits_for = |unit: usize| match unit {
         0 | 1 => 0,
         2 => 1,
         _ => 2,
     };
+    let mut size = value as f64;
+    let mut unit = 0;
+    // Round first: 999.96 MB is shown as 1.00 GB, not 1000.0 MB.
+    while unit < units.len() - 1 && {
+        let scale = 10f64.powi(digits_for(unit) as i32);
+        (size * scale).round() / scale >= 1000.0
+    } {
+        size /= 1000.0;
+        unit += 1;
+    }
+    let digits = digits_for(unit);
     let number = format!("{size:.digits$}");
     let number = if lang == Lang::Fr { number.replace('.', ",") } else { number };
     format!("{number} {}", units[unit])

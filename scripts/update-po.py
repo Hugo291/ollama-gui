@@ -21,19 +21,36 @@ msgstr ""
 
 
 def read_po(path):
+    """msgid -> msgstr. Handles entries wrapped over several lines by PO editors."""
     translations = {}
     if not os.path.exists(path):
         return translations
-    msgid = None
-    for line in open(path, encoding="utf-8"):
-        m = re.match(r'^msgid "(.*)"$', line.rstrip("\n"))
+    msgid = msgstr = field = None
+
+    def flush():
+        if msgid and msgstr is not None:
+            translations[msgid] = msgstr
+
+    for raw in open(path, encoding="utf-8"):
+        line = raw.rstrip("\n")
+        m = re.match(r'^(msgid|msgstr) "(.*)"$', line)
         if m:
-            msgid = m.group(1)
+            if m.group(1) == "msgid":
+                flush()
+                msgid, msgstr = m.group(2), None
+            else:
+                msgstr = m.group(2)
+            field = m.group(1)
             continue
-        m = re.match(r'^msgstr "(.*)"$', line.rstrip("\n"))
-        if m and msgid:
-            translations[msgid] = m.group(1)
-            msgid = None
+        m = re.match(r'^"(.*)"$', line)
+        if m and field == "msgid":
+            msgid += m.group(1)
+        elif m and field == "msgstr":
+            msgstr += m.group(1)
+        elif not line.strip() or line.startswith("#"):
+            flush()
+            msgid = msgstr = field = None
+    flush()
     return translations
 
 

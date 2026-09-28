@@ -6,7 +6,10 @@ export global Theme {
     // Set from Rust at startup.
     in property <bool> is-macos: true;
 
-    out property <bool> dark: Palette.color-scheme == ColorScheme.dark;
+    // Palette.color-scheme follows the system until the app forces light or dark. After
+    // going back to "System" it is `unknown`, and Rust tells whether the system is dark.
+    in property <bool> system-dark;
+    out property <bool> dark: Palette.color-scheme == ColorScheme.dark || (Palette.color-scheme == ColorScheme.unknown && system-dark);
 
     out property <color> accent: is-macos ? (dark ? #0a84ff : #007aff) : (dark ? #4cc2ff : #0067c0);
     out property <color> on-accent: is-macos ? #ffffff : (dark ? #000000 : #ffffff);
@@ -28,12 +31,15 @@ export global Theme {
     out property <color> overlay: dark ? #00000099 : #0000004d;
 
     out property <color> text: dark ? #f5f5f7 : #1d1d1f;
-    out property <color> text-secondary: dark ? #a1a1a6 : #6e6e73;
-    out property <color> text-tertiary: dark ? #6e6e73 : #a1a1a6;
+    // Contrast (WCAG AA): secondary text ≥ 4.5:1 on every background, tertiary is for
+    // placeholders and disabled controls.
+    out property <color> text-secondary: dark ? #a1a1a6 : #616165;
+    out property <color> text-tertiary: dark ? #8e8e93 : #86868b;
 
-    out property <color> green: dark ? #30d158 : #28a745;
-    out property <color> orange: dark ? #ff9f0a : #e8850c;
-    out property <color> red: dark ? #ff453a : #e0362c;
+    // Darker in the light theme, where they are also used for text on white.
+    out property <color> green: dark ? #30d158 : #1e7b34;
+    out property <color> orange: dark ? #ff9f0a : #b35c00;
+    out property <color> red: dark ? #ff453a : #c5221f;
     out property <color> blue: dark ? #0a84ff : #007aff;
 
     out property <length> font-size: is-macos ? 13px : 14px;

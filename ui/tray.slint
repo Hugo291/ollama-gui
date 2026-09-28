@@ -3,6 +3,8 @@ import { Palette } from "std-widgets.slint";
 export struct TrayModel {
     name: string,
     label: string,
+    // CPU/GPU split and unload time.
+    details: string,
     can-chat: bool,
 }
 
@@ -49,6 +51,11 @@ export component Tray inherits SystemTrayIcon {
         }
         for model in root.models: Menu {
             title: model.label;
+            MenuItem {
+                title: model.details;
+                enabled: false;
+            }
+            MenuSeparator { }
             if model.can-chat: MenuItem {
                 title: @tr("Chat");
                 activated => { root.chat(model.name); }

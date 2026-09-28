@@ -4,275 +4,283 @@ msgstr ""
 "Language: fr\n"
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
 
-#: ui/components.slint:61
+#: ui/components.slint:65
 msgid "Text"
 msgstr "Texte"
 
-#: ui/components.slint:62 ui/discover.slint:11 ui/models.slint:14
+#: ui/components.slint:66 ui/discover.slint:11 ui/models.slint:14
 msgid "Vision"
 msgstr "Vision"
 
-#: ui/components.slint:63 ui/discover.slint:12 ui/models.slint:15
+#: ui/components.slint:67 ui/discover.slint:12 ui/models.slint:15
 msgid "Tools"
 msgstr "Outils"
 
-#: ui/components.slint:64 ui/discover.slint:13 ui/models.slint:16 ui/playground.slint:200
+#: ui/components.slint:68 ui/discover.slint:13 ui/models.slint:16 ui/playground.slint:207
 msgid "Thinking"
 msgstr "Réflexion"
 
-#: ui/components.slint:65 ui/discover.slint:14 ui/models.slint:17
+#: ui/components.slint:69 ui/discover.slint:14 ui/models.slint:17
 msgid "Embedding"
 msgstr "Embedding"
 
-#: ui/components.slint:66 ui/models.slint:18
+#: ui/components.slint:70 ui/models.slint:18
 msgid "Image"
 msgstr "Image"
 
-#: ui/components.slint:67
+#: ui/components.slint:71
 msgid "Audio"
 msgstr "Audio"
 
-#: ui/components.slint:68
+#: ui/components.slint:72
 msgid "Insert"
 msgstr "Insertion"
 
-#: ui/components.slint:69 ui/discover.slint:15 ui/models.slint:13 ui/models.slint:297
+#: ui/components.slint:73 ui/discover.slint:15 ui/models.slint:13 ui/models.slint:327
 msgid "Cloud"
 msgstr "Cloud"
 
-#: ui/components.slint:256 ui/models.slint:422 ui/playground.slint:147
+#: ui/components.slint:179
+msgid "Clear"
+msgstr "Effacer"
+
+#: ui/components.slint:268 ui/models.slint:452 ui/playground.slint:153
 msgid "Copy"
 msgstr "Copier"
 
-#: ui/dialogs.slint:57
+#: ui/dialogs.slint:110
 msgid "Pull a Model"
 msgstr "Télécharger un modèle"
 
-#: ui/dialogs.slint:58
+#: ui/dialogs.slint:111
 msgid "Enter the name of a model from the Ollama library, optionally followed by a tag."
 msgstr "Saisissez le nom d’un modèle de la bibliothèque Ollama, éventuellement suivi d’un tag."
 
-#: ui/dialogs.slint:66 ui/dialogs.slint:131 ui/dialogs.slint:203
+#: ui/dialogs.slint:119 ui/dialogs.slint:185 ui/dialogs.slint:262
 msgid "This isn't a valid model name."
 msgstr "Ce nom de modèle n’est pas valide."
 
-#: ui/dialogs.slint:67
+#: ui/dialogs.slint:120
 msgid "Already installed: pulling it again updates it to the latest version."
 msgstr "Déjà installé : le télécharger à nouveau le met à jour vers la dernière version."
 
-#: ui/dialogs.slint:68
+#: ui/dialogs.slint:121
 msgid "Examples: gemma3, qwen3:8b, hf.co/unsloth/Qwen3-8B-GGUF:Q4_K_M"
 msgstr "Exemples : gemma3, qwen3:8b, hf.co/unsloth/Qwen3-8B-GGUF:Q4_K_M"
 
-#: ui/dialogs.slint:73
+#: ui/dialogs.slint:126
 msgid "Browse the Library…"
 msgstr "Parcourir la bibliothèque…"
 
-#: ui/dialogs.slint:81 ui/dialogs.slint:146 ui/dialogs.slint:255 ui/dialogs.slint:283 ui/downloads.slint:56 ui/settings.slint:142
+#: ui/dialogs.slint:134 ui/dialogs.slint:200 ui/dialogs.slint:316 ui/dialogs.slint:353 ui/discover.slint:103 ui/downloads.slint:59 ui/settings.slint:167
 msgid "Cancel"
 msgstr "Annuler"
 
-#: ui/dialogs.slint:85 ui/discover.slint:103
+#: ui/dialogs.slint:138 ui/discover.slint:121
 msgid "Pull"
 msgstr "Télécharger"
 
-#: ui/dialogs.slint:104
+#: ui/dialogs.slint:158
 msgid "Rename Model"
 msgstr "Renommer le modèle"
 
-#: ui/dialogs.slint:104
+#: ui/dialogs.slint:158
 msgid "Duplicate Model"
 msgstr "Dupliquer le modèle"
 
-#: ui/dialogs.slint:107
+#: ui/dialogs.slint:161
 msgid "Ollama has no rename: the model is copied under the new name, then the original name is removed. No data is downloaded again."
 msgstr "Ollama ne sait pas renommer : le modèle est copié sous le nouveau nom, puis l’ancien nom est supprimé. Aucune donnée n’est retéléchargée."
 
-#: ui/dialogs.slint:108
+#: ui/dialogs.slint:162
 msgid "The copy shares its data with the original, so it takes no extra disk space. Useful to give a model a shorter name."
 msgstr "La copie partage ses données avec l’original : elle n’occupe aucun espace disque supplémentaire. Pratique pour donner un nom plus court à un modèle."
 
-#: ui/dialogs.slint:112
+#: ui/dialogs.slint:166
 msgid "Model"
 msgstr "Modèle"
 
-#: ui/dialogs.slint:123
+#: ui/dialogs.slint:177
 msgid "New name"
 msgstr "Nouveau nom"
 
-#: ui/dialogs.slint:132 ui/dialogs.slint:203
+#: ui/dialogs.slint:186 ui/dialogs.slint:263
 msgid "Choose a different name."
 msgstr "Choisissez un autre nom."
 
-#: ui/dialogs.slint:133
+#: ui/dialogs.slint:187 ui/dialogs.slint:264
 msgid "A model with this name already exists and will be replaced."
 msgstr "Un modèle portant ce nom existe déjà et sera remplacé."
 
-#: ui/dialogs.slint:150
+#: ui/dialogs.slint:204
 msgid "Rename"
 msgstr "Renommer"
 
-#: ui/dialogs.slint:150
+#: ui/dialogs.slint:204
 msgid "Duplicate"
 msgstr "Dupliquer"
 
-#: ui/dialogs.slint:184
+#: ui/dialogs.slint:240
 msgid "Customize a Model"
 msgstr "Personnaliser un modèle"
 
-#: ui/dialogs.slint:186
+#: ui/dialogs.slint:242
 msgid "Creates a new model on top of an existing one, with its own system prompt and parameters. The weights are shared, so it takes almost no disk space."
 msgstr "Crée un nouveau modèle à partir d’un modèle existant, avec son propre prompt système et ses propres paramètres. Les poids sont partagés : il n’occupe presque aucun espace disque."
 
-#: ui/dialogs.slint:189
+#: ui/dialogs.slint:245
 msgid "Based on"
 msgstr "Basé sur"
 
-#: ui/dialogs.slint:198 ui/models.slint:240 ui/settings.slint:101
+#: ui/dialogs.slint:254 ui/models.slint:258 ui/settings.slint:123
 msgid "Name"
 msgstr "Nom"
 
-#: ui/dialogs.slint:205 ui/playground.slint:166
+#: ui/dialogs.slint:266 ui/playground.slint:173
 msgid "System Prompt"
 msgstr "Prompt système"
 
-#: ui/dialogs.slint:211 ui/models.slint:241
+#: ui/dialogs.slint:272 ui/models.slint:259
 msgid "Parameters"
 msgstr "Paramètres"
 
-#: ui/dialogs.slint:212
+#: ui/dialogs.slint:273
 msgid "Temperature"
 msgstr "Température"
 
-#: ui/dialogs.slint:222 ui/playground.slint:192
+#: ui/dialogs.slint:283 ui/playground.slint:199
 msgid "Context window"
 msgstr "Fenêtre de contexte"
 
-#: ui/dialogs.slint:227
+#: ui/dialogs.slint:288
 msgid "Top P"
 msgstr "Top P"
 
-#: ui/dialogs.slint:237
+#: ui/dialogs.slint:298
 msgid "Fixed seed"
 msgstr "Graine fixe"
 
-#: ui/dialogs.slint:259
+#: ui/dialogs.slint:320
 msgid "Create"
 msgstr "Créer"
 
-#: ui/dialogs.slint:277
+#: ui/dialogs.slint:347
 msgid "Delete “{}”?"
 msgstr "Supprimer « {} » ?"
 
-#: ui/dialogs.slint:287
+#: ui/dialogs.slint:357
 msgid "Delete"
 msgstr "Supprimer"
+
+#: ui/dialogs.slint:402
+msgid "Close"
+msgstr "Fermer"
 
 #: ui/discover.slint:16
 msgid "All Capabilities"
 msgstr "Toutes les capacités"
 
-#: ui/discover.slint:44 ui/discover.slint:98
+#: ui/discover.slint:50 ui/discover.slint:116
 msgid "Installed"
 msgstr "Installé"
 
-#: ui/discover.slint:116
+#: ui/discover.slint:137
 msgid "Tag"
 msgstr "Tag"
 
-#: ui/discover.slint:117 ui/models.slint:243
+#: ui/discover.slint:138 ui/models.slint:261
 msgid "Size"
 msgstr "Taille"
 
-#: ui/discover.slint:118 ui/running.slint:95
+#: ui/discover.slint:139 ui/running.slint:100
 msgid "Context"
 msgstr "Contexte"
 
-#: ui/discover.slint:119
+#: ui/discover.slint:140
 msgid "Input"
 msgstr "Entrée"
 
-#: ui/discover.slint:211
+#: ui/discover.slint:240
 msgid "Tags"
 msgstr "Tags"
 
-#: ui/discover.slint:217
+#: ui/discover.slint:246
 msgid "Filter tags"
 msgstr "Filtrer les tags"
 
-#: ui/discover.slint:235
+#: ui/discover.slint:264
 msgid "Can't Load Tags"
 msgstr "Impossible de charger les tags"
 
-#: ui/discover.slint:240 ui/discover.slint:306
+#: ui/discover.slint:269 ui/discover.slint:337
 msgid "Try Again"
 msgstr "Réessayer"
 
-#: ui/discover.slint:251 ui/sidebar.slint:124
+#: ui/discover.slint:280 ui/sidebar.slint:131
 msgid "Discover"
 msgstr "Découvrir"
 
-#: ui/discover.slint:267 ui/discover.slint:270
+#: ui/discover.slint:296 ui/discover.slint:299
 msgid "Popular"
 msgstr "Populaires"
 
-#: ui/discover.slint:267 ui/discover.slint:278
+#: ui/discover.slint:296 ui/discover.slint:307
 msgid "Newest"
 msgstr "Récents"
 
-#: ui/discover.slint:289
+#: ui/discover.slint:319
 msgid "Search models on ollama.com"
 msgstr "Rechercher des modèles sur ollama.com"
 
-#: ui/discover.slint:301
+#: ui/discover.slint:332
 msgid "Can't Reach ollama.com"
 msgstr "ollama.com est injoignable"
 
-#: ui/discover.slint:322 ui/models.slint:532
+#: ui/discover.slint:353 ui/models.slint:569
 msgid "No Results"
 msgstr "Aucun résultat"
 
-#: ui/discover.slint:342 ui/downloads.slint:112 ui/models.slint:525
+#: ui/discover.slint:388 ui/downloads.slint:116 ui/models.slint:562
 msgid "Discover Models"
 msgstr "Découvrir des modèles"
 
-#: ui/discover.slint:343
+#: ui/discover.slint:389
 msgid "Browse the Ollama library and pull models in one click."
 msgstr "Parcourez la bibliothèque Ollama et téléchargez des modèles en un clic."
 
-#: ui/downloads.slint:61
+#: ui/downloads.slint:64
 msgid "Show in Models"
 msgstr "Afficher dans Modèles"
 
-#: ui/downloads.slint:66 ui/sidebar.slint:104
+#: ui/downloads.slint:69 ui/sidebar.slint:111
 msgid "Retry"
 msgstr "Réessayer"
 
-#: ui/downloads.slint:71
+#: ui/downloads.slint:74
 msgid "Remove from List"
 msgstr "Retirer de la liste"
 
-#: ui/downloads.slint:80 ui/sidebar.slint:122 ui/tray.slint:67
+#: ui/downloads.slint:83 ui/sidebar.slint:129 ui/tray.slint:74
 msgid "Downloads"
 msgstr "Téléchargements"
 
-#: ui/downloads.slint:83
+#: ui/downloads.slint:86
 msgid "Remove finished downloads from the list"
 msgstr "Retirer les téléchargements terminés de la liste"
 
-#: ui/downloads.slint:90 ui/models.slint:482
+#: ui/downloads.slint:93 ui/models.slint:512
 msgid "Pull a model from the Ollama library"
 msgstr "Télécharger un modèle depuis la bibliothèque Ollama"
 
-#: ui/downloads.slint:101
+#: ui/downloads.slint:104
 msgid "No Downloads"
 msgstr "Aucun téléchargement"
 
-#: ui/downloads.slint:102
+#: ui/downloads.slint:105
 msgid "Models you pull or update appear here with their progress."
 msgstr "Les modèles que vous téléchargez ou mettez à jour apparaissent ici avec leur progression."
 
-#: ui/downloads.slint:107 ui/models.slint:520
+#: ui/downloads.slint:110 ui/models.slint:557
 msgid "Pull a Model…"
 msgstr "Télécharger un modèle…"
 
@@ -284,195 +292,199 @@ msgstr "Local"
 msgid "All Models"
 msgstr "Tous les modèles"
 
-#: ui/models.slint:86 ui/models.slint:307 ui/running.slint:77 ui/tray.slint:53
+#: ui/models.slint:102 ui/models.slint:337 ui/running.slint:82 ui/tray.slint:60
 msgid "Chat"
 msgstr "Discuter"
 
-#: ui/models.slint:91
+#: ui/models.slint:107
 msgid "Unload from Memory"
 msgstr "Décharger de la mémoire"
 
-#: ui/models.slint:95
+#: ui/models.slint:111
 msgid "Load into Memory"
 msgstr "Charger en mémoire"
 
-#: ui/models.slint:101 ui/models.slint:336 ui/models.slint:352
+#: ui/models.slint:117 ui/models.slint:366 ui/models.slint:382
 msgid "Update"
 msgstr "Mettre à jour"
 
-#: ui/models.slint:105 ui/models.slint:356
+#: ui/models.slint:121 ui/models.slint:386
 msgid "Duplicate…"
 msgstr "Dupliquer…"
 
-#: ui/models.slint:109 ui/models.slint:360
+#: ui/models.slint:125 ui/models.slint:390
 msgid "Rename…"
 msgstr "Renommer…"
 
-#: ui/models.slint:113 ui/models.slint:364
+#: ui/models.slint:129 ui/models.slint:394
 msgid "Customize…"
 msgstr "Personnaliser…"
 
-#: ui/models.slint:119 ui/models.slint:369
+#: ui/models.slint:135 ui/models.slint:399
 msgid "Copy Name"
 msgstr "Copier le nom"
 
-#: ui/models.slint:123 ui/models.slint:373
+#: ui/models.slint:139 ui/models.slint:403
 msgid "Open Model Page"
 msgstr "Ouvrir la page du modèle"
 
-#: ui/models.slint:129 ui/models.slint:378
+#: ui/models.slint:145 ui/models.slint:408
 msgid "Delete…"
 msgstr "Supprimer…"
 
-#: ui/models.slint:169
+#: ui/models.slint:185
 msgid "Loaded in memory"
 msgstr "Chargé en mémoire"
 
-#: ui/models.slint:183
+#: ui/models.slint:199
 msgid "Update available"
 msgstr "Mise à jour disponible"
 
-#: ui/models.slint:242
+#: ui/models.slint:260
 msgid "Quantization"
 msgstr "Quantification"
 
-#: ui/models.slint:244
+#: ui/models.slint:262
 msgid "Capabilities"
 msgstr "Capacités"
 
-#: ui/models.slint:245
+#: ui/models.slint:263
 msgid "Modified"
 msgstr "Modifié"
 
-#: ui/models.slint:298 ui/tray.slint:47
+#: ui/models.slint:328 ui/tray.slint:49
 msgid "In Memory"
 msgstr "En mémoire"
 
-#: ui/models.slint:299
+#: ui/models.slint:329
 msgid "Update Available"
 msgstr "Mise à jour disponible"
 
-#: ui/models.slint:300
+#: ui/models.slint:330
 msgid "Up to Date"
 msgstr "À jour"
 
-#: ui/models.slint:314 ui/running.slint:83 ui/tray.slint:57
+#: ui/models.slint:344 ui/running.slint:88 ui/tray.slint:64
 msgid "Unload"
 msgstr "Décharger"
 
-#: ui/models.slint:321
+#: ui/models.slint:351
 msgid "Load"
 msgstr "Charger"
 
-#: ui/models.slint:350
+#: ui/models.slint:380
 msgid "More"
 msgstr "Plus"
 
-#: ui/models.slint:407
+#: ui/models.slint:437
 msgid "Digest"
 msgstr "Empreinte"
 
-#: ui/models.slint:452 ui/sidebar.slint:120
+#: ui/models.slint:482 ui/sidebar.slint:127
 msgid "Models"
 msgstr "Modèles"
 
-#: ui/models.slint:469
+#: ui/models.slint:499
 msgid "Update all outdated models"
 msgstr "Mettre à jour tous les modèles obsolètes"
 
-#: ui/models.slint:475
+#: ui/models.slint:505
 msgid "Check the Ollama registry for newer versions of your models"
 msgstr "Vérifier sur le registre Ollama si vos modèles ont des versions plus récentes"
 
-#: ui/models.slint:489
+#: ui/models.slint:519
 msgid "Show or hide model details"
 msgstr "Afficher ou masquer les détails du modèle"
 
-#: ui/models.slint:497
+#: ui/models.slint:527
 msgid "Filter models"
 msgstr "Filtrer les modèles"
 
-#: ui/models.slint:509 ui/playground.slint:231 ui/running.slint:126
+#: ui/models.slint:546 ui/playground.slint:242 ui/running.slint:131
 msgid "Ollama Is Not Reachable"
 msgstr "Ollama est injoignable"
 
-#: ui/models.slint:509 ui/playground.slint:231 ui/running.slint:126
+#: ui/models.slint:546 ui/playground.slint:242 ui/running.slint:131
 msgid "Connecting…"
 msgstr "Connexion…"
 
-#: ui/models.slint:514
+#: ui/models.slint:551
 msgid "No Models Yet"
 msgstr "Aucun modèle"
 
-#: ui/models.slint:515
+#: ui/models.slint:552
 msgid "Pull a model from the Ollama library to get started."
 msgstr "Téléchargez un modèle depuis la bibliothèque Ollama pour commencer."
 
-#: ui/models.slint:547
+#: ui/models.slint:585
 msgid "No Selection"
 msgstr "Aucune sélection"
 
-#: ui/models.slint:548
+#: ui/models.slint:586
 msgid "Select a model to see its details."
 msgstr "Sélectionnez un modèle pour voir ses détails."
 
-#: ui/playground.slint:90
+#: ui/playground.slint:91 ui/playground.slint:99
 msgid "Thinking…"
 msgstr "Réflexion…"
 
-#: ui/playground.slint:90
+#: ui/playground.slint:91 ui/playground.slint:99
 msgid "Thoughts"
 msgstr "Réflexion"
 
-#: ui/playground.slint:126
+#: ui/playground.slint:132
 msgid "The model returned an empty reply."
 msgstr "Le modèle a renvoyé une réponse vide."
 
-#: ui/playground.slint:174
+#: ui/playground.slint:181
 msgid "Custom temperature"
 msgstr "Température personnalisée"
 
-#: ui/playground.slint:209 ui/sidebar.slint:125
+#: ui/playground.slint:220 ui/sidebar.slint:132
 msgid "Playground"
 msgstr "Bac à sable"
 
-#: ui/playground.slint:213
+#: ui/playground.slint:224
 msgid "System prompt and generation options"
 msgstr "Prompt système et options de génération"
 
-#: ui/playground.slint:220
+#: ui/playground.slint:231
 msgid "New conversation"
 msgstr "Nouvelle conversation"
 
-#: ui/playground.slint:236
+#: ui/playground.slint:247
 msgid "Try a Model"
 msgstr "Essayez un modèle"
 
-#: ui/playground.slint:237
+#: ui/playground.slint:248
 msgid "Choose a model below, then send a message."
 msgstr "Choisissez un modèle ci-dessous, puis envoyez un message."
 
-#: ui/playground.slint:237
+#: ui/playground.slint:248
 msgid "Send a message to {}. Replies stream in with their speed in tokens per second."
 msgstr "Envoyez un message à {}. Les réponses s’affichent en direct, avec leur vitesse en tokens par seconde."
 
-#: ui/playground.slint:308
+#: ui/playground.slint:326 ui/settings.slint:111
+msgid "Remove"
+msgstr "Supprimer"
+
+#: ui/playground.slint:335
 msgid "Attach images"
 msgstr "Joindre des images"
 
-#: ui/playground.slint:339
+#: ui/playground.slint:373 ui/playground.slint:384
 msgid "Message"
 msgstr "Message"
 
-#: ui/playground.slint:348
+#: ui/playground.slint:398
 msgid "Stop"
 msgstr "Arrêter"
 
-#: ui/playground.slint:355
+#: ui/playground.slint:404
 msgid "Send"
 msgstr "Envoyer"
 
-#: ui/playground.slint:365
+#: ui/playground.slint:414
 msgid "Return to send · Shift+Return for a new line"
 msgstr "Entrée pour envoyer · Maj+Entrée pour aller à la ligne"
 
@@ -480,174 +492,174 @@ msgstr "Entrée pour envoyer · Maj+Entrée pour aller à la ligne"
 msgid "Load Model"
 msgstr "Charger un modèle"
 
-#: ui/running.slint:68
+#: ui/running.slint:72
 msgid "Keep Loaded"
 msgstr "Garder chargé"
 
-#: ui/running.slint:93
+#: ui/running.slint:73
+msgid "Keep the model in memory for longer"
+msgstr "Garder le modèle en mémoire plus longtemps"
+
+#: ui/running.slint:98
 msgid "Memory"
 msgstr "Mémoire"
 
-#: ui/running.slint:94
+#: ui/running.slint:99
 msgid "Processor"
 msgstr "Processeur"
 
-#: ui/running.slint:96
+#: ui/running.slint:101
 msgid "Unloads"
 msgstr "Déchargement"
 
-#: ui/running.slint:108 ui/sidebar.slint:121
+#: ui/running.slint:113 ui/sidebar.slint:128
 msgid "Running"
 msgstr "En mémoire"
 
-#: ui/running.slint:115
+#: ui/running.slint:120
 msgid "Unload every model from memory"
 msgstr "Décharger tous les modèles de la mémoire"
 
-#: ui/running.slint:131
+#: ui/running.slint:136
 msgid "No Models in Memory"
 msgstr "Aucun modèle en mémoire"
 
-#: ui/running.slint:132
+#: ui/running.slint:137
 msgid "Models load automatically when they are used, and unload when their keep-alive expires."
 msgstr "Les modèles se chargent automatiquement quand ils sont utilisés, et se déchargent à l’expiration de leur keep-alive."
 
-#: ui/running.slint:149
+#: ui/running.slint:154
 msgid "Memory used by models"
 msgstr "Mémoire utilisée par les modèles"
 
-#: ui/settings.slint:57
+#: ui/settings.slint:77
 msgid "Current Server"
 msgstr "Serveur actuel"
 
-#: ui/settings.slint:70
+#: ui/settings.slint:90
 msgid "Reconnect"
 msgstr "Se reconnecter"
 
-#: ui/settings.slint:74
+#: ui/settings.slint:94
 msgid "Use This Server"
 msgstr "Utiliser ce serveur"
 
-#: ui/settings.slint:79
+#: ui/settings.slint:99
 msgid "Edit"
 msgstr "Modifier"
 
-#: ui/settings.slint:89
-msgid "Remove"
-msgstr "Supprimer"
-
-#: ui/settings.slint:107
+#: ui/settings.slint:129
 msgid "Address"
 msgstr "Adresse"
 
-#: ui/settings.slint:122
+#: ui/settings.slint:144
 msgid "Test Connection"
 msgstr "Tester la connexion"
 
-#: ui/settings.slint:146
+#: ui/settings.slint:171
 msgid "Save"
 msgstr "Enregistrer"
 
-#: ui/settings.slint:160 ui/sidebar.slint:127
+#: ui/settings.slint:187 ui/sidebar.slint:134
 msgid "Settings"
 msgstr "Réglages"
 
-#: ui/settings.slint:169
+#: ui/settings.slint:196
 msgid "Servers"
 msgstr "Serveurs"
 
-#: ui/settings.slint:177
+#: ui/settings.slint:204
 msgid "Add Server"
 msgstr "Ajouter un serveur"
 
-#: ui/settings.slint:184
+#: ui/settings.slint:211
 msgid "General"
 msgstr "Général"
 
-#: ui/settings.slint:186
+#: ui/settings.slint:213
 msgid "Keep models loaded for"
 msgstr "Garder les modèles chargés pendant"
 
-#: ui/settings.slint:187
+#: ui/settings.slint:214
 msgid "Applies when you load a model or chat in the Playground. Models are never kept in memory indefinitely."
 msgstr "S’applique quand vous chargez un modèle ou discutez dans le Bac à sable. Les modèles ne restent jamais en mémoire indéfiniment."
 
-#: ui/settings.slint:196
+#: ui/settings.slint:223
 msgid "Refresh status every"
 msgstr "Actualiser l’état toutes les"
 
-#: ui/settings.slint:205
+#: ui/settings.slint:232
 msgid "Check for model updates at launch"
 msgstr "Rechercher les mises à jour des modèles au lancement"
 
-#: ui/settings.slint:212
+#: ui/settings.slint:239
 msgid "Show in menu bar"
 msgstr "Afficher dans la barre des menus"
 
-#: ui/settings.slint:212
+#: ui/settings.slint:239
 msgid "Show in notification area"
 msgstr "Afficher dans la zone de notification"
 
-#: ui/settings.slint:219
+#: ui/settings.slint:246
 msgid "Appearance"
 msgstr "Apparence"
 
-#: ui/settings.slint:222
+#: ui/settings.slint:249
 msgid "System"
 msgstr "Système"
 
-#: ui/settings.slint:222
+#: ui/settings.slint:249
 msgid "Light"
 msgstr "Clair"
 
-#: ui/settings.slint:222
+#: ui/settings.slint:249
 msgid "Dark"
 msgstr "Sombre"
 
-#: ui/settings.slint:228
+#: ui/settings.slint:255
 msgid "About"
 msgstr "À propos"
 
-#: ui/settings.slint:243
+#: ui/settings.slint:270
 msgid "An independent open-source project, not affiliated with Ollama."
 msgstr "Un projet open source indépendant, sans lien avec Ollama."
 
-#: ui/settings.slint:250
+#: ui/settings.slint:277
 msgid "Source Code"
 msgstr "Code source"
 
-#: ui/sidebar.slint:92
+#: ui/sidebar.slint:98
 msgid "Manage Servers…"
 msgstr "Gérer les serveurs…"
 
-#: ui/sidebar.slint:99
+#: ui/sidebar.slint:106
 msgid "Start Ollama"
 msgstr "Démarrer Ollama"
 
-#: ui/sidebar.slint:119
+#: ui/sidebar.slint:126
 msgid "Library"
 msgstr "Bibliothèque"
 
-#: ui/sidebar.slint:123
+#: ui/sidebar.slint:130
 msgid "Explore"
 msgstr "Explorer"
 
-#: ui/tray.slint:43
+#: ui/tray.slint:45
 msgid "No models in memory"
 msgstr "Aucun modèle en mémoire"
 
-#: ui/tray.slint:62
+#: ui/tray.slint:69
 msgid "Unload All"
 msgstr "Tout décharger"
 
-#: ui/tray.slint:76
+#: ui/tray.slint:83
 msgid "Open Ollama GUI"
 msgstr "Ouvrir Ollama GUI"
 
-#: ui/tray.slint:80
+#: ui/tray.slint:87
 msgid "Settings…"
 msgstr "Réglages…"
 
-#: ui/tray.slint:85
+#: ui/tray.slint:92
 msgid "Quit Ollama GUI"
 msgstr "Quitter Ollama GUI"

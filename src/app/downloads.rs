@@ -255,7 +255,7 @@ fn start(app: &Rc<App>, id: i32) {
                     }
                 }
                 Err(error) => {
-                    failure = Some(error.to_string());
+                    failure = Some(app.text.api_error(&error));
                     break;
                 }
             }
@@ -286,18 +286,34 @@ fn start(app: &Rc<App>, id: i32) {
     });
 }
 
+fn cancel(download: &mut Download) {
+    if download.is_active() {
+        download.cancel_requested = true;
+        if let Some(abort) = &download.abort {
+            abort.abort();
+        }
+    }
+}
+
 pub fn bind(app: &Rc<App>, api: &Api) {
+    api.on_cancel_pull({
+        let app = Rc::downgrade(app);
+        move |name| {
+            let Some(app) = app.upgrade() else { return };
+            let server = app.state.borrow().settings.selected_server.clone();
+            let target = canonical(&name);
+            let mut downloads = app.downloads.borrow_mut();
+            if let Some(download) = downloads.items.iter_mut().find(|d| d.is_active() && d.server_id == server && canonical(&d.name) == target) {
+                cancel(download);
+            }
+        }
+    });
     api.on_cancel_download({
         let app = Rc::downgrade(app);
         move |id| {
             let Some(app) = app.upgrade() else { return };
-            if let Some(download) = app.downloads.borrow_mut().get_mut(id)
-                && download.is_active()
-            {
-                download.cancel_requested = true;
-                if let Some(abort) = &download.abort {
-                    abort.abort();
-                }
+            if let Some(download) = app.downloads.borrow_mut().get_mut(id) {
+                cancel(download);
             }
         }
     });

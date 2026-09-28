@@ -20,6 +20,25 @@ pub struct Library {
     tags_for: String,
     tags_generation: u64,
     debounce: slint::Timer,
+    /// Last page loaded, and whether ollama.com has more (it pages by 20).
+    page: u32,
+    has_more: bool,
+    loading_more: bool,
+}
+
+/// Search parameters, read from the interface.
+fn search_query(api: &Api) -> (String, Option<&'static str>, LibrarySort) {
+    let query = api.get_library_query().trim().to_owned();
+    let capability = match api.get_library_filter() {
+        1 => Some("vision"),
+        2 => Some("tools"),
+        3 => Some("thinking"),
+        4 => Some("embedding"),
+        5 => Some("cloud"),
+        _ => None,
+    };
+    let sort = if api.get_library_sort() == 1 { LibrarySort::Newest } else { LibrarySort::Popular };
+    (query, capability, sort)
 }
 
 fn strings(values: &[String]) -> ModelRc<SharedString> {
@@ -38,6 +57,14 @@ pub fn bind(app: &Rc<App>, api: &Api) {
                     search(&app);
                 }
             });
+        }
+    });
+    api.on_library_load_more({
+        let app = Rc::downgrade(app);
+        move || {
+            if let Some(app) = app.upgrade() {
+                load_more(&app);
+            }
         }
     });
     api.on_select_library({
@@ -80,28 +107,21 @@ pub fn ensure_loaded(app: &Rc<App>) {
 fn search(app: &Rc<App>) {
     let ui = app.ui();
     let api = ui.global::<Api>();
-    let query = api.get_library_query().trim().to_owned();
-    let capability = match api.get_library_filter() {
-        1 => Some("vision"),
-        2 => Some("tools"),
-        3 => Some("thinking"),
-        4 => Some("embedding"),
-        5 => Some("cloud"),
-        _ => None,
-    };
-    let sort = if api.get_library_sort() == 1 { LibrarySort::Newest } else { LibrarySort::Popular };
+    let (query, capability, sort) = search_query(&api);
     let generation = {
         let mut library = app.library.borrow_mut();
         library.search_generation += 1;
         library.searching = true;
+        library.loading_more = false;
         library.search_generation
     };
+    api.set_library_loading_more(false);
     api.set_library_loading(true);
     api.set_library_error(SharedString::new());
     let http = app.http.clone();
     let app = app.clone();
     let _ = slint::spawn_local(async move {
-        let result = app.io(async move { ollama_library::search(&http, &query, capability, sort).await }).await;
+        let result = app.io(async move { ollama_library::search(&http, &query, capability, sort, 1).await }).await;
         if app.library.borrow().search_generation != generation {
             return;
         }
@@ -114,24 +134,83 @@ fn search(app: &Rc<App>) {
         }
         api.set_library_loading(false);
         match result {
-            Some(Ok(found)) => {
+            Some(Ok(page)) => {
+                let found = page.models;
                 let selected = api.get_library_selected().to_string();
                 let keep = found.iter().any(|m| m.path == selected);
                 let first = found.first().map(|m| m.path.clone()).unwrap_or_default();
-                app.library.borrow_mut().results = found;
+                {
+                    let mut library = app.library.borrow_mut();
+                    library.results = found;
+                    library.page = 1;
+                    library.has_more = page.has_more;
+                }
+                api.set_library_has_more(page.has_more);
                 sync(&app);
                 if !keep {
                     select(&app, first);
                 }
             }
             Some(Err(error)) => {
-                app.library.borrow_mut().results.clear();
-                api.set_library_error(error.to_string().into());
+                {
+                    let mut library = app.library.borrow_mut();
+                    library.results.clear();
+                    library.has_more = false;
+                }
+                api.set_library_has_more(false);
+                api.set_library_error(app.text.api_error(&error).into());
                 sync(&app);
                 select(&app, String::new());
             }
             None => {}
         }
+    });
+}
+
+/// Appends the next page of results (the list asks for it when scrolled to the end).
+fn load_more(app: &Rc<App>) {
+    let (page, generation) = {
+        let mut library = app.library.borrow_mut();
+        if !library.has_more || library.loading_more || library.searching {
+            return;
+        }
+        library.loading_more = true;
+        (library.page + 1, library.search_generation)
+    };
+    let ui = app.ui();
+    let api = ui.global::<Api>();
+    api.set_library_loading_more(true);
+    let (query, capability, sort) = search_query(&api);
+    let http = app.http.clone();
+    let app = app.clone();
+    let _ = slint::spawn_local(async move {
+        let result = app.io(async move { ollama_library::search(&http, &query, capability, sort, page).await }).await;
+        // Another search started meanwhile: these results belong to the previous one.
+        if app.library.borrow().search_generation != generation {
+            return;
+        }
+        let ui = app.ui();
+        let api = ui.global::<Api>();
+        {
+            let mut library = app.library.borrow_mut();
+            library.loading_more = false;
+            match result {
+                Some(Ok(more)) => {
+                    for model in more.models {
+                        if !library.results.iter().any(|m| m.path == model.path) {
+                            library.results.push(model);
+                        }
+                    }
+                    library.page = page;
+                    library.has_more = more.has_more;
+                }
+                // Not shown as an error: the results already there stay usable.
+                _ => library.has_more = false,
+            }
+            api.set_library_has_more(library.has_more);
+        }
+        api.set_library_loading_more(false);
+        sync(&app);
     });
 }
 
@@ -177,7 +256,7 @@ fn load_tags(app: &Rc<App>, path: String) {
         api.set_tags_loading(false);
         match result {
             Some(Ok(tags)) => app.library.borrow_mut().tags = tags,
-            Some(Err(error)) => api.set_tags_error(error.to_string().into()),
+            Some(Err(error)) => api.set_tags_error(app.text.api_error(&error).into()),
             None => {}
         }
         sync_tags(&app);
@@ -203,7 +282,7 @@ pub fn sync(app: &Rc<App>) {
             summary: m.summary.clone().into(),
             capabilities: strings(&m.capabilities),
             sizes: strings(&m.sizes),
-            pulls: m.pulls.clone().unwrap_or_default().into(),
+            pulls: m.pulls.as_deref().map(|pulls| app.text.site_count(pulls)).unwrap_or_default().into(),
             installed: has_installed_tag(app, m),
         })
         .collect();
@@ -235,7 +314,8 @@ fn short_context(context: Option<&str>) -> String {
     match context {
         None => "—".into(),
         Some(context) => {
-            let lower = context.to_lowercase();
+            // ASCII lowercasing keeps byte offsets valid for slicing the original text.
+            let lower = context.to_ascii_lowercase();
             match lower.find("context window") {
                 Some(start) => format!("{}{}", &context[..start], &context[start + "context window".len()..]).trim().to_owned(),
                 None => context.trim().to_owned(),
@@ -264,9 +344,9 @@ pub fn sync_tags(app: &Rc<App>) {
                 name: tag.name.clone().into(),
                 tag: tag.tag().into(),
                 badges: strings(&tag.badges),
-                size: tag.size.clone().unwrap_or_else(|| "—".into()).into(),
+                size: tag.size.as_deref().map(|size| app.text.site_size(size)).unwrap_or_else(|| "—".into()).into(),
                 context: short_context(tag.context.as_deref()).into(),
-                input: tag.input.clone().unwrap_or_else(|| "—".into()).into(),
+                input: tag.input.as_deref().map(|input| app.text.site_input(input)).unwrap_or_else(|| "—".into()).into(),
                 state: if download.is_some() {
                     1
                 } else if installed {
