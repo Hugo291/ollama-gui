@@ -46,7 +46,8 @@ echo "▸ Signing (${CODESIGN_IDENTITY:-ad-hoc})"
 codesign --force --timestamp=none --sign "${CODESIGN_IDENTITY:--}" "$APP"
 codesign --verify --strict "$APP"
 
-ZIP="$DIST/OllamaGUI-$VERSION.zip"
+# A stable name, so that the "latest release" download links keep working.
+ZIP="$DIST/OllamaGUI-macOS.zip"
 rm -f "$ZIP"
 ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
 
