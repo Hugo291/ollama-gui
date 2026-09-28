@@ -62,14 +62,18 @@ public struct OllamaClient: Sendable {
             guard scheme == "http" || scheme == "https" else { return nil }
             text = scheme + text[separator.lowerBound...]
         } else {
-            let hostPart = text.prefix { $0 != "/" }
+            // Before the path; the host follows the user name and password, if any.
+            let authority = text.prefix { $0 != "/" }
+            let userInfo = authority.lastIndex(of: "@").map { authority[...$0] } ?? ""
+            let hostPart = authority.dropFirst(userInfo.count)
+            let path = text.dropFirst(authority.count)
             let port = hostPart.dropFirst()
             if hostPart.hasPrefix(":"), !port.isEmpty, port.allSatisfy(\.isASCII), port.allSatisfy(\.isNumber) {
                 // A port alone: this Mac.
-                text = "127.0.0.1" + text
+                text = userInfo + "127.0.0.1" + hostPart + path
             } else if !hostPart.hasPrefix("["), hostPart.filter({ $0 == ":" }).count >= 2 {
                 // A bare IPv6 address.
-                text = "[" + hostPart + "]" + text.dropFirst(hostPart.count)
+                text = userInfo + "[" + hostPart + "]" + path
             }
             text = "http://" + text
         }
@@ -104,10 +108,14 @@ public struct OllamaClient: Sendable {
         return components.url?.absoluteString ?? url.absoluteString
     }
 
-    /// Whether the URL points to this Mac.
+    /// Whether the URL points to this Mac: `localhost`, 127.0.0.0/8 or `::1`.
     public static func isLoopback(_ url: URL) -> Bool {
-        guard let host = URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedHost?.lowercased() else { return false }
-        return ["localhost", "127.0.0.1", "[::1]"].contains(host)
+        guard var host = URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedHost?.lowercased() else { return false }
+        if host.hasSuffix(".") { host.removeLast() }
+        if host == "localhost" || host.hasSuffix(".localhost") || host == "[::1]" { return true }
+        if host.hasPrefix("[::ffff:") { host = String(host.dropFirst("[::ffff:".count).dropLast()) }
+        let octets = host.split(separator: ".", omittingEmptySubsequences: false)
+        return octets.count == 4 && octets[0] == "127" && octets.allSatisfy { UInt8($0) != nil }
     }
 
     // MARK: - Endpoints

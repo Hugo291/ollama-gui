@@ -70,6 +70,8 @@ struct BaseURLTests {
         ("http://localhost:11434/api", "http://localhost:11434"),
         ("https://example.com/ollama/api/", "https://example.com/ollama"),
         ("HTTP://Example.com", "http://example.com:11434"),
+        ("user:secret@example.com:8080", "http://user:secret@example.com:8080"),
+        ("user:secret@::1", "http://user:secret@[::1]:11434"),
     ])
     func normalizesAddresses(input: String, expected: String) throws {
         let url = try #require(OllamaClient.baseURL(from: input))
@@ -99,10 +101,12 @@ struct BaseURLTests {
     }
 
     @Test func loopbackAddresses() throws {
-        for address in ["localhost", "127.0.0.1", "::1", ":8080", "0.0.0.0"] {
+        for address in ["localhost", "127.0.0.1", "::1", ":8080", "0.0.0.0", "127.0.0.2", "localhost.", "[::ffff:127.0.0.1]"] {
             #expect(OllamaClient.isLoopback(try #require(OllamaClient.baseURL(from: address))), "\(address)")
         }
-        #expect(!OllamaClient.isLoopback(try #require(OllamaClient.baseURL(from: "192.168.1.20"))))
+        for address in ["192.168.1.20", "127.example.com", "example.com"] {
+            #expect(!OllamaClient.isLoopback(try #require(OllamaClient.baseURL(from: address))), "\(address)")
+        }
     }
 
     @Test(arguments: ["", "ftp://host", "http://", "not a host"])

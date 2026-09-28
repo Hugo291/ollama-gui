@@ -15,7 +15,7 @@ import SwiftUI
 /// read or written); `OLLAMA_GUI_V2_SETTINGS` points the version 2 import at a test file.
 /// Commands: `wait:seconds`, `section:name`, `select:name[,name…]`, `select-all`,
 /// `search:text`, `filter:all|local|cloud|vision|tools|thinking|embedding|image`, `reveal:name`,
-/// `discover-search:text`, `discover-more`,
+/// `discover-search:text`, `discover-more`, `load:model`, `thinking:on|off`, `send`, `wait-reply`,
 /// `delete-selection`, `cancel-dialogs`, `appearance:system|light|dark`, `size:width,height`,
 /// `chat:model`, `draft:text`, `markdown-sample`, `inspector`, `shot:name`, `print`, `quit`.
 @MainActor
@@ -105,6 +105,19 @@ enum ScriptDriver {
             app.openPlayground(with: argument)
         case "draft":
             app.playground.draft = argument.replacingOccurrences(of: "\\n", with: "\n")
+        case "load":
+            // With the keep-alive of the settings: models never stay loaded indefinitely.
+            await app.load(argument)
+        case "thinking":
+            app.playground.thinkingEnabled = argument != "off"
+        case "send":
+            let thinking = app.model(named: app.playground.modelName)?.supports(.thinking) ?? false
+            app.playground.send(using: app.client, keepAlive: app.settings.keepAliveSeconds, supportsThinking: thinking)
+        case "wait-reply":
+            // Until the reply ends, at most two minutes.
+            for _ in 0..<240 where app.playground.isGenerating {
+                try? await Task.sleep(for: .milliseconds(500))
+            }
         case "markdown-sample":
             app.playground.messages.append(PlaygroundMessage(role: .user, content: "Compare two models in a table."))
             app.playground.messages.append(PlaygroundMessage(role: .assistant, content: markdownSample, model: app.playground.modelName))

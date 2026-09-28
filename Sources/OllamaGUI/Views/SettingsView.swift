@@ -245,12 +245,15 @@ private struct ServerEditor: View {
         let url = draft.url
         testResult = .testing
         Task {
+            let result: TestResult
             do {
-                let version = try await OllamaClient(baseURL: url).version()
-                testResult = .success(version)
+                result = .success(try await OllamaClient(baseURL: url).version())
             } catch {
-                testResult = .failure(error.localizedDescription)
+                result = .failure(error.localizedDescription)
             }
+            // The address changed during the test: the result is about another address.
+            guard draft.url == url else { return }
+            testResult = result
         }
     }
 }
