@@ -66,6 +66,7 @@ final class AppModel {
     let settings: AppSettings
     let downloads = DownloadManager()
     let playground = PlaygroundModel()
+    let discover = DiscoverModel()
 
     // Server state
     private(set) var connection: ConnectionState = .connecting
@@ -103,6 +104,9 @@ final class AppModel {
 
     init(settings: AppSettings? = nil) {
         self.settings = settings ?? AppSettings()
+        playground.onReplyEnded = { [weak self] in
+            Task { await self?.refreshRunning() }
+        }
         downloads.onCompleted = { [weak self] task in
             guard let self, task.serverID == self.settings.selectedServerID else { return }
             self.updates[task.modelName] = nil

@@ -239,3 +239,14 @@
 
 /* Settings: server editor */
 "Save" = "Enregistrer";
+
+/* Playground: image attachments */
+"Some images weren't attached" = "Certaines images n’ont pas été jointes";
+"At most 8 images per message." = "8 images au plus par message.";
+"%@ is larger than 20 MB." = "%@ dépasse 20 Mo.";
+"%@ couldn't be read as an image." = "%@ n’a pas pu être lu comme une image.";
+
+/* Settings: about */
+"Version" = "Version";
+"Source Code" = "Code source";
+"An independent open-source project, not affiliated with Ollama." = "Un projet open source indépendant, sans lien avec Ollama.";

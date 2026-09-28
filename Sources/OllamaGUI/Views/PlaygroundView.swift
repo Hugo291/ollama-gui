@@ -54,10 +54,14 @@ struct PlaygroundView: View {
         .onChange(of: app.models) { _, _ in selectDefaultModel() }
     }
 
+    /// Picks a model when none is chosen, or when the chosen one is no longer installed
+    /// (deleted, or another server), unless a reply is being generated.
     private func selectDefaultModel() {
         let playground = app.playground
-        guard playground.modelName.isEmpty else { return }
         let chatModels = app.models.filter(\.canChat)
+        guard playground.modelName.isEmpty
+            || (app.hasLoadedModels && !playground.isGenerating && !chatModels.contains { $0.name == playground.modelName })
+        else { return }
         let running = chatModels.first { app.isRunning($0.name) }
         playground.modelName = (running ?? chatModels.first { !$0.isCloud } ?? chatModels.first)?.name ?? ""
     }
@@ -176,8 +180,15 @@ private struct MessageView: View {
                     .foregroundStyle(.red)
                     .font(.callout)
                 }
-                if let stats = message.stats {
-                    StatsLine(stats: stats)
+                HStack(spacing: 12) {
+                    if let stats = message.stats {
+                        StatsLine(stats: stats)
+                    }
+                    if !message.isStreaming, !message.content.isEmpty {
+                        CopyButton(text: message.content)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -468,22 +479,53 @@ private struct Composer: View {
         .padding(12)
         .fileImporter(isPresented: $importing, allowedContentTypes: [.image], allowsMultipleSelection: true) { result in
             guard case .success(let urls) = result else { return }
-            for url in urls {
-                let scoped = url.startAccessingSecurityScopedResource()
-                defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-                if let data = try? Data(contentsOf: url) { playground.attachments.append(data) }
-            }
+            attach(urls)
         }
         .dropDestination(for: URL.self) { urls, _ in
             guard supportsVision else { return false }
-            let images = urls.compactMap { url -> Data? in
-                guard let type = UTType(filenameExtension: url.pathExtension), type.conforms(to: .image) else { return nil }
-                return try? Data(contentsOf: url)
+            let images = urls.filter { url in
+                UTType(filenameExtension: url.pathExtension)?.conforms(to: .image) ?? false
             }
-            playground.attachments.append(contentsOf: images)
+            attach(images)
             return !images.isEmpty
         }
         .onAppear { focused = true }
+        // Images only go to models that can see them.
+        .onChange(of: supportsVision) { _, supports in
+            if !supports { playground.attachments = [] }
+        }
+    }
+
+    private static let maxImages = 8
+    private static let maxImageBytes = 20_000_000
+
+    /// Adds images to the next message: at most 8, of 20 MB each, that macOS can read as images.
+    private func attach(_ urls: [URL]) {
+        let playground = app.playground
+        guard supportsVision else { return }
+        var problems: [String] = []
+        for url in urls {
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            let name = url.lastPathComponent
+            guard playground.attachments.count < Self.maxImages else {
+                problems.append(String(localized: "At most 8 images per message."))
+                break
+            }
+            let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+            guard size <= Self.maxImageBytes else {
+                problems.append(String(localized: "\(name) is larger than 20 MB."))
+                continue
+            }
+            guard let data = try? Data(contentsOf: url), NSImage(data: data) != nil else {
+                problems.append(String(localized: "\(name) couldn't be read as an image."))
+                continue
+            }
+            playground.attachments.append(data)
+        }
+        if !problems.isEmpty {
+            app.errorAlert = ErrorAlert(title: String(localized: "Some images weren't attached"), message: problems.joined(separator: "\n"))
+        }
     }
 
     private var selectedModel: OllamaModel? {

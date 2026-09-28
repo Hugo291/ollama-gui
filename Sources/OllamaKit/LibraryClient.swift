@@ -59,6 +59,18 @@ public enum LibrarySort: String, CaseIterable, Sendable {
     case newest
 }
 
+/// One page of search results; ollama.com shows 20 per page.
+public struct LibraryPage: Sendable {
+    public var models: [LibraryModel]
+    /// Whether ollama.com offers the next page.
+    public var hasMore: Bool
+
+    public init(models: [LibraryModel], hasMore: Bool) {
+        self.models = models
+        self.hasMore = hasMore
+    }
+}
+
 /// Reads the public model library of ollama.com.
 ///
 /// ollama.com has no public search API, so this parses the HTML of the search and tags
@@ -72,8 +84,9 @@ public struct LibraryClient: Sendable {
         self.session = session
     }
 
-    /// `capability` is one of `vision`, `tools`, `thinking`, `embedding`, `cloud`.
-    public func search(query: String, capability: String? = nil, sort: LibrarySort = .popular) async throws -> [LibraryModel] {
+    /// `capability` is one of `vision`, `tools`, `thinking`, `embedding`, `cloud`. Pages after the
+    /// first are the fragments the site loads while scrolling.
+    public func search(query: String, capability: String? = nil, sort: LibrarySort = .popular, page: Int = 1) async throws -> LibraryPage {
         var components = URLComponents(url: Self.baseURL.appending(path: "search"), resolvingAgainstBaseURL: false)!
         var items = [URLQueryItem(name: "q", value: query)]
         if let capability {
@@ -82,17 +95,22 @@ public struct LibraryClient: Sendable {
         if sort != .popular {
             items.append(URLQueryItem(name: "o", value: sort.rawValue))
         }
+        if page > 1 {
+            items.append(URLQueryItem(name: "page", value: String(page)))
+        }
         components.queryItems = items
-        return LibraryParser.parseSearch(try await fetchHTML(components.url!))
+        let html = try await fetchHTML(components.url!, fragment: page > 1)
+        return LibraryPage(models: LibraryParser.parseSearch(html), hasMore: LibraryParser.linksToPage(page + 1, in: html))
     }
 
     public func tags(for model: LibraryModel) async throws -> [LibraryTag] {
         LibraryParser.parseTags(try await fetchHTML(model.pageURL.appending(path: "tags")))
     }
 
-    private func fetchHTML(_ url: URL) async throws -> String {
+    private func fetchHTML(_ url: URL, fragment: Bool = false) async throws -> String {
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 20)
         request.setValue("text/html", forHTTPHeaderField: "Accept")
+        if fragment { request.setValue("true", forHTTPHeaderField: "HX-Request") }
         let (data, response) = try await session.data(for: request)
         try OllamaClient.validate(response, data: data)
         guard let html = String(data: data, encoding: .utf8) else { throw OllamaError.unexpectedResponse }
@@ -115,6 +133,7 @@ public enum LibraryParser {
     private static let digest = regex(#"\b([0-9a-f]{12})\b"#, caseInsensitive: false)
     private static let sizeBadge = regex(#"^(?:e?\d+(?:\.\d+)?|\d+x\d+(?:\.\d+)?)[kmbt]$"#)
     private static let htmlTag = regex(#"<[^>]+>"#)
+    private static let nextPage = regex(#"hx-get="/search\?[^"]*?\bpage=(\d+)"#)
 
     public static func parseSearch(_ html: String) -> [LibraryModel] {
         var results: [LibraryModel] = []
@@ -188,6 +207,11 @@ public enum LibraryParser {
             ))
         }
         return results
+    }
+
+    /// Whether the page loads `page` next (`hx-get="/search?page=3&amp;q=qwen"`).
+    public static func linksToPage(_ page: Int, in html: String) -> Bool {
+        matches(nextPage, in: html).contains { $0[1].flatMap(Int.init) == page }
     }
 
     static func isSizeBadge(_ text: String) -> Bool {

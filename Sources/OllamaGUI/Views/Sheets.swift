@@ -212,6 +212,7 @@ struct CreateModelSheet: View {
     private var canSubmit: Bool {
         !isWorking && !base.isEmpty && ModelReference(trimmedName) != nil
             && ModelReference.canonical(trimmedName) != ModelReference.canonical(base)
+            && (!useSeed || seed >= 0)
     }
 
     var body: some View {
@@ -302,11 +303,17 @@ struct CreateModelSheet: View {
         .onChange(of: base) { _, _ in loadBaseSystemPrompt() }
     }
 
+    /// `gemma3-custom:latest`, or `gemma3-custom-2:latest`… when that name is taken.
     private func prefill() {
         base = request.base
-        if let reference = ModelReference(request.base) {
-            name = "\(reference.repository)-custom:latest"
+        let repository = ModelReference(request.base)?.repository ?? "model"
+        var candidate = "\(repository)-custom:latest"
+        var number = 2
+        while app.isInstalled(candidate) {
+            candidate = "\(repository)-custom-\(number):latest"
+            number += 1
         }
+        name = candidate
     }
 
     private func loadBaseSystemPrompt() {

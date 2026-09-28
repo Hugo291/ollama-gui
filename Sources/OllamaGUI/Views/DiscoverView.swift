@@ -28,21 +28,11 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
 
 struct DiscoverView: View {
     private var app: AppModel { .shared }
-    @State private var query = ""
-    @State private var filter: LibraryFilter = .all
-    @State private var sort: LibrarySort = .popular
-    @State private var results: [LibraryModel] = []
-    @State private var isLoading = false
-    @State private var error: String?
-    @State private var selection: LibraryModel.ID?
-
-    private struct SearchKey: Equatable {
-        var query: String
-        var filter: LibraryFilter
-        var sort: LibrarySort
-    }
+    private var discover: DiscoverModel { app.discover }
 
     var body: some View {
+        @Bindable var discover = discover
+
         HSplitView {
             resultsList
                 .frame(minWidth: 300, idealWidth: 380, maxWidth: 560)
@@ -51,11 +41,11 @@ struct DiscoverView: View {
         }
         .navigationTitle(Text("Discover"))
         .navigationSubtitle(Text(verbatim: "ollama.com"))
-        .searchable(text: $query, placement: .toolbar, prompt: Text("Search models on ollama.com"))
+        .searchable(text: $discover.query, placement: .toolbar, prompt: Text("Search models on ollama.com"))
         .toolbar {
             ToolbarItemGroup {
                 Menu {
-                    Picker(selection: $filter) {
+                    Picker(selection: $discover.filter) {
                         ForEach(LibraryFilter.allCases) { filter in
                             Text(filter.title).tag(filter)
                         }
@@ -65,12 +55,12 @@ struct DiscoverView: View {
                     .pickerStyle(.inline)
                     .labelsHidden()
                 } label: {
-                    Label("Capability", systemImage: filter == .all ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+                    Label("Capability", systemImage: discover.filter == .all ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
                 }
                 .help(Text("Show only models with a given capability"))
                 .accessibilityLabel(Text("Capability"))
 
-                Picker(selection: $sort) {
+                Picker(selection: $discover.sort) {
                     Text("Popular").tag(LibrarySort.popular)
                     Text("Newest").tag(LibrarySort.newest)
                 } label: {
@@ -79,66 +69,55 @@ struct DiscoverView: View {
                 .pickerStyle(.segmented)
             }
         }
-        .task(id: SearchKey(query: query, filter: filter, sort: sort)) {
-            if !results.isEmpty || error != nil {
-                // Debounce typing.
-                try? await Task.sleep(for: .milliseconds(350))
-                guard !Task.isCancelled else { return }
-            }
-            await search()
+        .onAppear {
+            if !discover.hasSearched { discover.search() }
         }
-    }
-
-    private func search() async {
-        isLoading = true
-        defer { isLoading = false }
-        do {
-            let found = try await LibraryClient().search(
-                query: query.trimmingCharacters(in: .whitespaces),
-                capability: filter.queryValue,
-                sort: sort
-            )
-            guard !Task.isCancelled else { return }
-            results = found
-            error = nil
-            if selection == nil || !found.contains(where: { $0.id == selection }) {
-                selection = found.first?.id
-            }
-        } catch {
-            guard !Task.isCancelled else { return }
-            self.error = error.localizedDescription
-            results = []
-        }
+        .onChange(of: discover.query) { _, _ in discover.search(debounce: true) }
+        .onChange(of: discover.filter) { _, _ in discover.search() }
+        .onChange(of: discover.sort) { _, _ in discover.search() }
     }
 
     // MARK: Results
 
     private var resultsList: some View {
-        List(results, selection: $selection) { model in
-            LibraryModelRow(model: model)
-                .tag(model.id)
+        @Bindable var discover = discover
+
+        return List(selection: $discover.selection) {
+            ForEach(discover.results) { model in
+                LibraryModelRow(model: model)
+                    .tag(model.id)
+                    .onAppear {
+                        // The end of the list: load the next page.
+                        if model.id == discover.results.last?.id { discover.loadMore() }
+                    }
+            }
+            if discover.isLoadingMore {
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(maxWidth: .infinity)
+            }
         }
         .listStyle(.inset)
         .overlay {
-            if let error {
+            if let error = discover.error {
                 ContentUnavailableView {
                     Label("Can't Reach ollama.com", systemImage: "wifi.exclamationmark")
                 } description: {
                     Text(verbatim: error)
                 } actions: {
-                    Button("Try Again") { Task { await search() } }
+                    Button("Try Again") { discover.search() }
                 }
-            } else if results.isEmpty && isLoading {
+            } else if discover.results.isEmpty && discover.isLoading {
                 ProgressView()
-            } else if results.isEmpty {
-                ContentUnavailableView.search(text: query)
+            } else if discover.results.isEmpty && discover.hasSearched {
+                ContentUnavailableView.search(text: discover.query)
             }
         }
     }
 
     @ViewBuilder
     private var detail: some View {
-        if let model = results.first(where: { $0.id == selection }) {
+        if let model = discover.results.first(where: { $0.id == discover.selection }) {
             LibraryModelDetail(model: model)
                 .id(model.id)
         } else {
@@ -168,7 +147,7 @@ private struct LibraryModelRow: View {
                 Spacer()
                 if let pulls = model.pulls {
                     Label {
-                        Text(verbatim: pulls)
+                        Text(verbatim: LibraryText.count(pulls, french: app.discover.french))
                     } icon: {
                         Image(systemName: "arrow.down.circle")
                     }
@@ -247,7 +226,7 @@ private struct LibraryModelDetail: View {
             HStack(spacing: 16) {
                 if let pulls = model.pulls {
                     Label {
-                        Text("\(pulls) pulls")
+                        Text("\(LibraryText.count(pulls, french: app.discover.french)) pulls")
                     } icon: {
                         Image(systemName: "arrow.down.circle")
                     }
@@ -265,7 +244,7 @@ private struct LibraryModelDetail: View {
                 }
                 if let updated = model.updated {
                     Label {
-                        Text(verbatim: updated)
+                        Text(verbatim: LibraryText.age(updated, french: app.discover.french))
                     } icon: {
                         Image(systemName: "clock")
                     }
@@ -285,7 +264,9 @@ private struct LibraryModelDetail: View {
     private var filteredTags: [LibraryTag] {
         let query = tagFilter.trimmingCharacters(in: .whitespaces)
         guard !query.isEmpty else { return tags }
-        return tags.filter { $0.name.localizedCaseInsensitiveContains(query) }
+        return tags.filter { tag in
+            tag.name.localizedCaseInsensitiveContains(query) || tag.badges.contains { $0.localizedCaseInsensitiveContains(query) }
+        }
     }
 
     @ViewBuilder
@@ -326,9 +307,9 @@ private struct LibraryModelDetail: View {
                     }
                     .width(min: 120, ideal: 200)
                     TableColumn("Size") { tag in
-                        Text(verbatim: tag.size ?? "—")
+                        Text(verbatim: tag.size.map { LibraryText.size($0, french: app.discover.french) } ?? "—")
                             .monospacedDigit()
-                            .help(Text(verbatim: tag.size ?? ""))
+                            .help(Text(verbatim: tag.size.map { LibraryText.size($0, french: app.discover.french) } ?? ""))
                     }
                     .width(min: 60, ideal: 110)
                     TableColumn("Context") { tag in
@@ -336,7 +317,7 @@ private struct LibraryModelDetail: View {
                     }
                     .width(min: 50, ideal: 70)
                     TableColumn("Input") { tag in
-                        Text(verbatim: tag.input ?? "—")
+                        Text(verbatim: tag.input.map { LibraryText.input($0, french: app.discover.french) } ?? "—")
                             .foregroundStyle(.secondary)
                     }
                     .width(min: 60, ideal: 120)

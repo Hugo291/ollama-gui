@@ -15,6 +15,7 @@ import SwiftUI
 /// read or written); `OLLAMA_GUI_V2_SETTINGS` points the version 2 import at a test file.
 /// Commands: `wait:seconds`, `section:name`, `select:name[,name…]`, `select-all`,
 /// `search:text`, `filter:all|local|cloud|vision|tools|thinking|embedding|image`, `reveal:name`,
+/// `discover-search:text`, `discover-more`,
 /// `delete-selection`, `cancel-dialogs`, `appearance:system|light|dark`, `size:width,height`,
 /// `chat:model`, `draft:text`, `markdown-sample`, `inspector`, `shot:name`, `print`, `quit`.
 @MainActor
@@ -77,6 +78,10 @@ enum ScriptDriver {
             app.modelFilter = ModelFilter(rawValue: argument) ?? .all
         case "reveal":
             app.reveal(argument)
+        case "discover-search":
+            app.discover.query = argument
+        case "discover-more":
+            app.discover.loadMore()
         case "select-all":
             // Like ⌘A in the table: the models shown.
             app.modelSelection = Set(app.visibleModels.map(\.name))
@@ -145,6 +150,8 @@ enum ScriptDriver {
         if let request = app.deleteRequest {
             log("dialog: \(app.deleteTitle(for: request)) | \(app.deleteMessage(for: request).replacingOccurrences(of: "\n", with: " / "))")
         }
+        let discover = app.discover
+        log("discover: results=\(discover.results.count) hasMore=\(discover.hasMore) loading=\(discover.isLoading) more=\(discover.isLoadingMore) error=\(discover.error ?? "-") selection=\(discover.selection ?? "-") query=\"\(discover.query)\"")
         log("state: section=\(app.section?.rawValue ?? "-") connection=\(app.connection) models=\(app.models.count) visible=\(app.visibleModels.count) selected=\(app.modelSelection.count) search=\"\(app.modelSearch)\" filter=\(app.modelFilter.rawValue) running=\(app.running.count) downloads=\(app.downloads.tasks.count) delete=\(app.deleteRequest?.names.count ?? 0) appearance=\(settings.appearance) keepAlive=\(settings.keepAliveSeconds) refresh=\(settings.refreshInterval) servers=\(settings.servers.map(\.address)) window=\(size)")
     }
 

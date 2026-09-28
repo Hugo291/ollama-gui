@@ -9,7 +9,7 @@ struct SettingsView: View {
             GeneralSettingsView()
                 .tabItem { Label("General", systemImage: "gearshape") }
         }
-        .frame(width: 600, height: 400)
+        .frame(width: 600, height: 460)
     }
 }
 
@@ -46,6 +46,22 @@ private struct GeneralSettingsView: View {
                 }
                 Toggle("Check for model updates at launch", isOn: $settings.checkUpdatesOnLaunch)
                 Toggle("Show in menu bar", isOn: $settings.showMenuBarExtra)
+            }
+            Section {
+                LabeledContent("Version") {
+                    Text(verbatim: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—")
+                }
+                LabeledContent {
+                    Link(destination: URL(string: "https://github.com/Hugo291/ollama-gui")!) {
+                        Text(verbatim: "github.com/Hugo291/ollama-gui")
+                    }
+                } label: {
+                    Text("Source Code")
+                }
+            } footer: {
+                Text("An independent open-source project, not affiliated with Ollama.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

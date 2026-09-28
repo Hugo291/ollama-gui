@@ -50,6 +50,9 @@ final class PlaygroundModel {
             && (!draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !attachments.isEmpty)
     }
 
+    /// Called when a reply ends, to refresh what is loaded in memory.
+    @ObservationIgnored var onReplyEnded: (() -> Void)?
+
     func send(using client: OllamaClient, keepAlive: Int, supportsThinking: Bool) {
         guard canSend else { return }
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -98,6 +101,7 @@ final class PlaygroundModel {
             self?.update(reply.id) { $0.isStreaming = false }
             self?.isGenerating = false
             self?.generationTask = nil
+            self?.onReplyEnded?()
         }
     }
 
