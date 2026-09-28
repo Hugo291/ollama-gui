@@ -230,3 +230,9 @@
 "Choose a model below, then send a message." = "Choisissez un modèle ci-dessous, puis envoyez un message.";
 "The model returned an empty reply." = "Le modèle a renvoyé une réponse vide.";
 "Model used for the next message" = "Modèle utilisé pour le prochain message";
+
+/* Settings: appearance */
+"Appearance" = "Apparence";
+"System" = "Système";
+"Light" = "Clair";
+"Dark" = "Sombre";

@@ -221,66 +221,112 @@ private struct StatsLine: View {
     }
 }
 
-/// Renders inline Markdown, with fenced code blocks shown as code.
+/// Renders a reply's Markdown: paragraphs, headings, code, quotes, lists, tables and rules.
 struct MarkdownText: View {
     let text: String
 
-    private enum Segment {
-        case text(String)
-        case code(String)
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(Array(MarkdownParser.blocks(text).enumerated()), id: \.offset) { _, block in
+                MarkdownBlockView(block: block)
+            }
+        }
     }
+}
+
+private struct MarkdownBlockView: View {
+    let block: MarkdownBlock
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ForEach(Array(segments.enumerated()), id: \.offset) { _, segment in
-                switch segment {
-                case .text(let value):
-                    Text(Self.attributed(value))
-                        .textSelection(.enabled)
-                        .fixedSize(horizontal: false, vertical: true)
-                case .code(let value):
-                    CodeBlock(text: value, maxHeight: 400)
+        switch block {
+        case .paragraph(let text):
+            InlineMarkdown(text: text)
+        case .heading(let level, let text):
+            InlineMarkdown(text: text)
+                .font(level == 1 ? .title2.bold() : level == 2 ? .title3.bold() : .headline)
+                .padding(.top, 2)
+        case .code(_, let text):
+            CodeBlock(text: text, maxHeight: 400)
+        case .quote(let text):
+            HStack(alignment: .top, spacing: 10) {
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(.tertiary)
+                    .frame(width: 3)
+                InlineMarkdown(text: text)
+                    .foregroundStyle(.secondary)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+        case .list(let items):
+            VStack(alignment: .leading, spacing: 5) {
+                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(verbatim: item.number.map { "\($0)." } ?? (item.level == 0 ? "•" : "◦"))
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                        InlineMarkdown(text: item.text)
+                    }
+                    .padding(.leading, CGFloat(item.level) * 18)
                 }
             }
+        case .table(let table):
+            MarkdownTableView(table: table)
+        case .rule:
+            Divider()
         }
     }
+}
 
-    private var segments: [Segment] {
-        var result: [Segment] = []
-        let parts = text.components(separatedBy: "```")
-        for (index, part) in parts.enumerated() {
-            if index % 2 == 1 {
-                // Drop the language line of the fence.
-                var lines = part.components(separatedBy: "\n")
-                if let first = lines.first, !first.contains(" "), lines.count > 1 { lines.removeFirst() }
-                let code = lines.joined(separator: "\n").trimmingCharacters(in: .newlines)
-                result.append(.code(code))
-            } else {
-                let trimmed = part.trimmingCharacters(in: .newlines)
-                if !trimmed.isEmpty { result.append(.text(trimmed)) }
+private struct MarkdownTableView: View {
+    let table: MarkdownTable
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 16, verticalSpacing: 6) {
+                GridRow {
+                    ForEach(Array(table.header.enumerated()), id: \.offset) { column, cell in
+                        InlineMarkdown(text: cell)
+                            .fontWeight(.semibold)
+                            .gridColumnAlignment(alignment(column))
+                    }
+                }
+                Divider()
+                ForEach(Array(table.rows.enumerated()), id: \.offset) { _, row in
+                    GridRow {
+                        ForEach(Array(row.enumerated()), id: \.offset) { _, cell in
+                            InlineMarkdown(text: cell)
+                        }
+                    }
+                }
             }
+            .padding(10)
         }
-        return result
+        .scrollIndicators(.automatic)
+        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .fixedSize(horizontal: false, vertical: true)
     }
 
-    private static func attributed(_ markdown: String) -> AttributedString {
-        // Headings and bullets aren't supported by inline Markdown: emulate them.
-        let prepared = markdown
-            .components(separatedBy: "\n")
-            .map { line -> String in
-                let trimmed = line.trimmingCharacters(in: .whitespaces)
-                if let range = trimmed.range(of: #"^#{1,6}\s+"#, options: .regularExpression) {
-                    return "**" + trimmed[range.upperBound...] + "**"
-                }
-                if trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") {
-                    let indent = String(line.prefix { $0 == " " })
-                    return indent + "• " + trimmed.dropFirst(2)
-                }
-                return line
-            }
-            .joined(separator: "\n")
+    private func alignment(_ column: Int) -> HorizontalAlignment {
+        switch table.alignments[column] {
+        case .leading: .leading
+        case .center: .center
+        case .trailing: .trailing
+        }
+    }
+}
+
+/// Bold, italic, inline code, strikethrough and links; line breaks are kept.
+private struct InlineMarkdown: View {
+    let text: String
+
+    var body: some View {
+        Text(Self.attributed(text))
+            .textSelection(.enabled)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    static func attributed(_ markdown: String) -> AttributedString {
         let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace, failurePolicy: .returnPartiallyParsedIfPossible)
-        return (try? AttributedString(markdown: prepared, options: options)) ?? AttributedString(markdown)
+        return (try? AttributedString(markdown: markdown, options: options)) ?? AttributedString(markdown)
     }
 }
 

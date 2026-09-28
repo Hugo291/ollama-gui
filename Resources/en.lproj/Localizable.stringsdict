@@ -146,5 +146,37 @@
 			<string>Update %lld Models</string>
 		</dict>
 	</dict>
+	<key>Couldn't delete %lld models</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@value@</string>
+		<key>value</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Couldn't delete %lld model</string>
+			<key>other</key>
+			<string>Couldn't delete %lld models</string>
+		</dict>
+	</dict>
+	<key>%@ and %lld others</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%1$@ %2$#@others@</string>
+		<key>others</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>and %2$lld other</string>
+			<key>other</key>
+			<string>and %2$lld others</string>
+		</dict>
+	</dict>
 </dict>
 </plist>

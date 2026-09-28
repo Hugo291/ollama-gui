@@ -22,6 +22,7 @@ struct ModelInspector: View {
     }
 }
 
+/// Several models selected: how many, their size, and what can be done to all of them.
 private struct MultipleSelectionView: View {
     private var app: AppModel { .shared }
     let names: [String]
@@ -29,12 +30,25 @@ private struct MultipleSelectionView: View {
     var body: some View {
         let models = names.compactMap(app.model(named:))
         let size = models.filter { !$0.isCloud }.reduce(0) { $0 + $1.size }
+        let running = names.filter(app.isRunning).count
+        let updatable = app.updatableNames(names)
         ContentUnavailableView {
             Label("\(names.count) models selected", systemImage: "square.stack.3d.up")
         } description: {
-            Text(verbatim: Format.bytes(size))
+            if running > 0 {
+                Text(verbatim: Format.bytes(size) + " · " + String(localized: "\(running) loaded"))
+            } else {
+                Text(verbatim: Format.bytes(size))
+            }
         } actions: {
-            Button("Delete…", role: .destructive) { app.requestDelete(names) }
+            VStack(spacing: 8) {
+                Button("Update \(updatable.count) Models") { app.updateModels(names) }
+                    .disabled(updatable.isEmpty || !app.connection.isConnected)
+                if running > 0 {
+                    Button("Unload from Memory") { Task { await app.unloadModels(names) } }
+                }
+                Button("Delete \(names.count) Models…", role: .destructive) { app.requestDelete(names) }
+            }
         }
     }
 }

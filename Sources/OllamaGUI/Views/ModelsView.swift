@@ -172,41 +172,53 @@ private struct ModelsTable: View {
     let rows: [OllamaModel]
     @Binding var sortOrder: [KeyPathComparator<OllamaModel>]
     @Binding var showInspector: Bool
+    /// Widths, order and hidden columns (right-click a column title), kept between launches.
+    @State private var columns = Self.savedColumns()
 
     var body: some View {
         @Bindable var app = app
 
-        Table(rows, selection: $app.modelSelection, sortOrder: $sortOrder) {
+        Table(rows, selection: $app.modelSelection, sortOrder: $sortOrder, columnCustomization: $columns) {
             TableColumn("Name", value: \.name, comparator: .localizedStandard) { model in
                 ModelNameCell(model: model)
             }
-            .width(min: 200, ideal: 270)
+            .width(min: 140, ideal: 180)
+            .customizationID("name")
+            .disabledCustomizationBehavior(.visibility)
 
             TableColumn("Parameters", value: \.parameterSortValue) { model in
                 Text(verbatim: model.parameterSize ?? "—")
                     .monospacedDigit()
             }
-            .width(min: 70, ideal: 90)
+            .width(min: 56, ideal: 70)
+            .customizationID("parameters")
 
             TableColumn("Quantization", value: \.quantizationSortValue) { model in
                 Text(verbatim: model.quantization ?? "—")
             }
-            .width(min: 80, ideal: 105)
+            .width(min: 64, ideal: 84)
+            .customizationID("quantization")
 
             TableColumn("Size", value: \.sizeSortValue) { model in
                 SizeCell(model: model)
             }
-            .width(min: 65, ideal: 80)
+            .width(min: 56, ideal: 68)
+            .customizationID("size")
 
             TableColumn("Capabilities") { model in
                 CapabilityIcons(capabilities: model.capabilities ?? [])
             }
-            .width(min: 90, ideal: 115)
+            .width(min: 64, ideal: 90)
+            .customizationID("capabilities")
 
             TableColumn("Modified", value: \.modifiedSortValue) { model in
                 ModifiedCell(date: model.modifiedAt)
             }
-            .width(min: 80, ideal: 105)
+            .width(min: 64, ideal: 88)
+            .customizationID("modified")
+        }
+        .onChange(of: columns) { _, columns in
+            app.settings.modelsTableColumns = try? JSONEncoder().encode(columns)
         }
         .contextMenu(forSelectionType: String.self) { names in
             ModelContextMenu(names: Array(names))
@@ -216,6 +228,15 @@ private struct ModelsTable: View {
         .onDeleteCommand {
             app.requestDelete(Array(app.modelSelection))
         }
+    }
+}
+
+extension ModelsTable {
+    private static func savedColumns() -> TableColumnCustomization<OllamaModel> {
+        guard let data = AppModel.shared.settings.modelsTableColumns,
+              let columns = try? JSONDecoder().decode(TableColumnCustomization<OllamaModel>.self, from: data)
+        else { return TableColumnCustomization() }
+        return columns
     }
 }
 
@@ -297,7 +318,7 @@ struct ModelContextMenu: View {
             }
             Divider()
             Button("Update") { app.pull(name) }
-                .disabled(model.reference == nil)
+                .disabled(app.updatableNames([name]).isEmpty)
             Button("Duplicate…") { app.copyRequest = CopyRequest(source: name, mode: .duplicate) }
             Button("Rename…") { app.copyRequest = CopyRequest(source: name, mode: .rename) }
             Button("Customize…") { app.createRequest = CreateRequest(base: name) }
@@ -313,17 +334,11 @@ struct ModelContextMenu: View {
             Divider()
             Button("Delete…", role: .destructive) { app.requestDelete([name]) }
         } else if !names.isEmpty {
-            Button("Update \(names.count) Models") {
-                names.forEach(app.pull)
-            }
+            let updatable = app.updatableNames(names)
+            Button("Update \(updatable.count) Models") { app.updateModels(names) }
+                .disabled(updatable.isEmpty)
             if names.contains(where: app.isRunning) {
-                Button("Unload from Memory") {
-                    Task {
-                        for name in names where app.isRunning(name) {
-                            await app.unload(name)
-                        }
-                    }
-                }
+                Button("Unload from Memory") { Task { await app.unloadModels(names) } }
             }
             Divider()
             Button("Delete \(names.count) Models…", role: .destructive) { app.requestDelete(names) }

@@ -32,9 +32,21 @@ struct OllamaGUIApp: App {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        MainActor.assumeIsolated {
+            AppModel.shared.settings.appearance.apply()
+        }
+    }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        #if DEBUG
+        MainActor.assumeIsolated { ScriptDriver.start() }
+        #endif
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         // Keep running in the menu bar when the menu bar item is enabled.
-        !(UserDefaults.standard.object(forKey: "showMenuBarExtra") as? Bool ?? true)
+        MainActor.assumeIsolated { !AppModel.shared.settings.showMenuBarExtra }
     }
 }
 

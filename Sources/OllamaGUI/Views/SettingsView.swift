@@ -21,6 +21,14 @@ private struct GeneralSettingsView: View {
 
         Form {
             Section {
+                Picker("Appearance", selection: $settings.appearance) {
+                    ForEach(Appearance.allCases) { appearance in
+                        Text(appearance.title).tag(appearance)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+            Section {
                 Picker("Keep models loaded for", selection: $settings.keepAliveSeconds) {
                     ForEach(KeepAliveOption.choices, id: \.self) { seconds in
                         Text(verbatim: KeepAliveOption.title(for: seconds)).tag(seconds)
@@ -32,11 +40,9 @@ private struct GeneralSettingsView: View {
             }
             Section {
                 Picker("Refresh status every", selection: $settings.refreshInterval) {
-                    Text(verbatim: KeepAliveOption.title(for: 2)).tag(2.0)
-                    Text(verbatim: KeepAliveOption.title(for: 3)).tag(3.0)
-                    Text(verbatim: KeepAliveOption.title(for: 5)).tag(5.0)
-                    Text(verbatim: KeepAliveOption.title(for: 10)).tag(10.0)
-                    Text(verbatim: KeepAliveOption.title(for: 30)).tag(30.0)
+                    ForEach(RefreshOption.choices, id: \.self) { seconds in
+                        Text(verbatim: KeepAliveOption.title(for: Int(seconds))).tag(seconds)
+                    }
                 }
                 Toggle("Check for model updates at launch", isOn: $settings.checkUpdatesOnLaunch)
                 Toggle("Show in menu bar", isOn: $settings.showMenuBarExtra)

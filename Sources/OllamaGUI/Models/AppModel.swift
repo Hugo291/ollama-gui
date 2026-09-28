@@ -57,7 +57,11 @@ final class AppModel {
     /// The single app state. Views read it directly rather than through the SwiftUI
     /// environment: table cells and split view columns can be updated after they left
     /// the hierarchy, where an environment object is no longer available.
+    #if DEBUG
+    static let shared = AppModel(settings: ScriptDriver.settings())
+    #else
     static let shared = AppModel()
+    #endif
 
     let settings: AppSettings
     let downloads = DownloadManager()
@@ -253,16 +257,29 @@ final class AppModel {
         deleteRequest = DeleteRequest(names: names.sorted())
     }
 
+    /// Deletes models one after the other on the server they were chosen on, unloading them first.
     func delete(_ names: [String]) async {
+        let serverID = settings.selectedServerID
+        let client = self.client
+        var failures: [(name: String, message: String)] = []
         for name in names {
+            guard serverID == settings.selectedServerID else { return }
             do {
                 if isRunning(name) { try? await client.unload(name) }
                 try await client.delete(name)
                 modelSelection.remove(name)
                 updates[name] = nil
             } catch {
-                present(error, title: String(localized: "Couldn't delete \(name)"))
+                failures.append((name, error.localizedDescription))
             }
+        }
+        if failures.count == 1, let failure = failures.first {
+            errorAlert = ErrorAlert(title: String(localized: "Couldn't delete \(failure.name)"), message: failure.message)
+        } else if let failure = failures.first {
+            errorAlert = ErrorAlert(
+                title: String(localized: "Couldn't delete \(failures.count) models"),
+                message: Self.nameList(failures.map(\.name)) + "\n\n" + failure.message
+            )
         }
         await refreshModels()
         await refreshRunning()
@@ -273,13 +290,56 @@ final class AppModel {
         await refreshModels()
     }
 
-    /// Ollama has no rename: copy, then delete the original.
+    /// Ollama has no rename: copy, then delete the original, on the same server.
     func rename(from source: String, to destination: String) async throws {
+        let serverID = settings.selectedServerID
+        let client = self.client
         try await client.copy(from: source, to: destination)
         if isRunning(source) { try? await client.unload(source) }
         try await client.delete(source)
+        guard serverID == settings.selectedServerID else { return }
         await refreshModels()
         modelSelection = [destination]
+    }
+
+    // MARK: Several models
+
+    /// Models a pull can update: installed from a registry, not cloud models.
+    func updatableNames(_ names: [String]) -> [String] {
+        names.filter { name in model(named: name).map { !$0.isCloud && $0.reference != nil } ?? false }
+    }
+
+    func updateModels(_ names: [String]) {
+        updatableNames(names).forEach(pull)
+    }
+
+    func unloadModels(_ names: [String]) async {
+        for name in names where isRunning(name) {
+            await unload(name)
+        }
+    }
+
+    func deleteTitle(for request: DeleteRequest) -> String {
+        if request.names.count == 1, let name = request.names.first {
+            return String(localized: "Delete “\(name)”?")
+        }
+        return String(localized: "Delete \(request.names.count) models?")
+    }
+
+    /// The models (when there are several), then the disk space the deletion frees.
+    func deleteMessage(for request: DeleteRequest) -> String {
+        let size = request.names.compactMap(model(named:)).filter { !$0.isCloud }.reduce(0) { $0 + $1.size }
+        let consequence = size > 0
+            ? String(localized: "This frees \(Format.bytes(size)) of disk space. Deleted models can be pulled again at any time.")
+            : String(localized: "Deleted models can be pulled again at any time.")
+        return request.names.count > 1 ? Self.nameList(request.names) + "\n\n" + consequence : consequence
+    }
+
+    /// `a, b, c, d, e and 3 others`.
+    static func nameList(_ names: [String]) -> String {
+        let shown = names.prefix(5).joined(separator: ", ")
+        let others = names.count - 5
+        return others > 0 ? String(localized: "\(shown) and \(others) others") : shown
     }
 
     func load(_ name: String, keepAlive: Int? = nil) async {
@@ -320,20 +380,28 @@ final class AppModel {
             isCheckingUpdates = false
             lastUpdateCheck = Date()
         }
+        let serverID = settings.selectedServerID
         for model in candidates { updates[model.name] = .checking }
 
         let registry = RegistryClient()
-        await withTaskGroup(of: (String, UpdateStatus).self) { group in
+        await withTaskGroup(of: (OllamaModel, UpdateStatus).self) { group in
             var next = 0
             func enqueue() {
                 guard next < candidates.count else { return }
                 let model = candidates[next]
                 next += 1
-                group.addTask { (model.name, await registry.status(for: model)) }
+                group.addTask { (model, await registry.status(for: model)) }
             }
             for _ in 0..<4 { enqueue() }
-            while let (name, status) = await group.next() {
-                updates[name] = status
+            while let (checked, status) = await group.next() {
+                // Another server, or a model that changed meanwhile (pulled, deleted): the result is stale.
+                if serverID == settings.selectedServerID {
+                    if model(named: checked.name)?.digest == checked.digest {
+                        updates[checked.name] = status
+                    } else if updates[checked.name] == .checking {
+                        updates[checked.name] = nil
+                    }
+                }
                 enqueue()
             }
         }

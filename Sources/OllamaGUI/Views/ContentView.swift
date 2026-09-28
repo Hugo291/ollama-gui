@@ -24,7 +24,7 @@ struct ContentView: View {
             CreateModelSheet(request: request)
         }
         .confirmationDialog(
-            deleteTitle,
+            app.deleteRequest.map(app.deleteTitle(for:)) ?? "",
             isPresented: Binding(get: { app.deleteRequest != nil }, set: { if !$0 { app.deleteRequest = nil } }),
             titleVisibility: .visible,
             presenting: app.deleteRequest
@@ -34,7 +34,7 @@ struct ContentView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: { request in
-            Text(deleteMessage(for: request))
+            Text(verbatim: app.deleteMessage(for: request))
         }
         .alert(
             app.errorAlert?.title ?? "",
@@ -56,22 +56,5 @@ struct ContentView: View {
         case .discover: DiscoverView()
         case .playground: PlaygroundView()
         }
-    }
-
-    private var deleteTitle: String {
-        guard let request = app.deleteRequest else { return "" }
-        if request.names.count == 1, let name = request.names.first {
-            return String(localized: "Delete “\(name)”?")
-        }
-        return String(localized: "Delete \(request.names.count) models?")
-    }
-
-    private func deleteMessage(for request: DeleteRequest) -> String {
-        let models = request.names.compactMap(app.model(named:))
-        let size = models.filter { !$0.isCloud }.reduce(0) { $0 + $1.size }
-        if size > 0 {
-            return String(localized: "This frees \(Format.bytes(size)) of disk space. Deleted models can be pulled again at any time.")
-        }
-        return String(localized: "Deleted models can be pulled again at any time.")
     }
 }
