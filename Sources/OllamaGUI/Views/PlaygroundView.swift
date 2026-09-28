@@ -52,6 +52,10 @@ struct PlaygroundView: View {
         }
         .onAppear(perform: selectDefaultModel)
         .onChange(of: app.models) { _, _ in selectDefaultModel() }
+        // A model that disappeared during a reply is replaced once the reply ends.
+        .onChange(of: app.playground.isGenerating) { _, generating in
+            if !generating { selectDefaultModel() }
+        }
     }
 
     /// Picks a model when none is chosen, or when the chosen one is no longer installed
@@ -512,12 +516,16 @@ private struct Composer: View {
                 problems.append(String(localized: "At most 8 images per message."))
                 break
             }
-            let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+            // Files on this Mac only (an image dragged from a web page is a web address).
+            guard url.isFileURL, let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize else {
+                problems.append(String(localized: "\(name) couldn't be read as an image."))
+                continue
+            }
             guard size <= Self.maxImageBytes else {
                 problems.append(String(localized: "\(name) is larger than 20 MB."))
                 continue
             }
-            guard let data = try? Data(contentsOf: url), NSImage(data: data) != nil else {
+            guard let data = try? Data(contentsOf: url), data.count <= Self.maxImageBytes, NSImage(data: data) != nil else {
                 problems.append(String(localized: "\(name) couldn't be read as an image."))
                 continue
             }

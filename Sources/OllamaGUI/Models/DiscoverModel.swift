@@ -19,6 +19,8 @@ final class DiscoverModel {
     private(set) var hasSearched = false
 
     @ObservationIgnored private var page = 1
+    /// Pages in a row that brought only models already listed.
+    @ObservationIgnored private var emptyPages = 0
     /// Results of an older search are dropped.
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var searchTask: Task<Void, Never>?
@@ -48,13 +50,15 @@ final class DiscoverModel {
                 results = found.models
                 hasMore = found.hasMore
                 page = 1
+                emptyPages = 0
                 error = nil
                 if selection == nil || !results.contains(where: { $0.id == self.selection }) {
                     selection = results.first?.id
                 }
             } catch {
-                guard let self, generation == self.generation, !(error is CancellationError) else { return }
-                if (error as? URLError)?.code == .cancelled { return }
+                guard let self, generation == self.generation else { return }
+                isLoading = false
+                if error is CancellationError || (error as? URLError)?.code == .cancelled { return }
                 self.error = error.localizedDescription
                 results = []
                 hasMore = false
@@ -83,9 +87,14 @@ final class DiscoverModel {
                 return
             }
             let known = Set(results.map(\.id))
-            results += found.models.filter { !known.contains($0.id) }
+            let added = found.models.filter { !known.contains($0.id) }
+            results += added
             page = next
-            hasMore = found.hasMore && !found.models.isEmpty
+            emptyPages = added.isEmpty ? emptyPages + 1 : 0
+            hasMore = found.hasMore && !found.models.isEmpty && emptyPages < 3
+            // Nothing new to show (the list moved between two pages): the last row won't
+            // appear again to ask for more, so continue right away.
+            if added.isEmpty, hasMore { loadMore() }
         }
     }
 }
