@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Ollama GUI</title>
-  <meta name="description" content="A desktop app for macOS and Windows to manage your Ollama models: pull, update, inspect, load, customize and chat.">
+  <meta name="description" content="A native macOS app to manage your Ollama models: pull, update, inspect, load, customize and chat. Windows version 2.2 also available.">
   <meta property="og:title" content="Ollama GUI">
-  <meta property="og:description" content="Manage your Ollama models on macOS and Windows, without the terminal.">
+  <meta property="og:description" content="Manage your Ollama models on your Mac, without the terminal.">
   <meta property="og:image" content="https://hugo291.github.io/ollama-gui/screenshots/models.png">
   <meta property="og:type" content="website">
   <link rel="icon" type="image/png" href="icon.png">
@@ -131,32 +131,32 @@
       <img class="icon" src="icon.png" alt="Ollama GUI icon" width="112" height="112">
       <h1>Ollama GUI</h1>
       <p class="tagline">
-        <span lang="en">Manage your Ollama models on macOS and Windows. Pull, update, inspect, load, customize and chat, without the terminal.</span>
-        <span lang="fr">Gérez vos modèles Ollama sur macOS et Windows. Téléchargez, mettez à jour, inspectez, chargez, personnalisez et discutez, sans le terminal.</span>
+        <span lang="en">A native Mac app to manage your Ollama models. Pull, update, inspect, load, customize and chat, without the terminal.</span>
+        <span lang="fr">Une app Mac native pour gérer vos modèles Ollama. Téléchargez, mettez à jour, inspectez, chargez, personnalisez et discutez, sans le terminal.</span>
       </p>
       <div class="downloads">
         <a class="button" id="dl-mac" href="https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-macOS.zip">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
           <span><span lang="en">Download for macOS</span><span lang="fr">Télécharger pour macOS</span></span>
         </a>
-        <a class="button" id="dl-win" href="https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-Windows-Setup.exe">
+        <a class="button" id="dl-win" href="https://github.com/Hugo291/ollama-gui/releases/download/v2.2.0/OllamaGUI-Windows-Setup.exe">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
-          <span><span lang="en">Download for Windows</span><span lang="fr">Télécharger pour Windows</span></span>
+          <span><span lang="en">Windows (version 2.2)</span><span lang="fr">Windows (version 2.2)</span></span>
         </a>
       </div>
       <p class="meta">
-        <span lang="en">Free and open source (MIT) · macOS 11+ (Apple silicon and Intel) · Windows 10 and 11 (64-bit) · <a href="https://github.com/Hugo291/ollama-gui/releases">All releases</a></span>
-        <span lang="fr">Gratuit et open source (MIT) · macOS 11+ (Apple silicon et Intel) · Windows 10 et 11 (64 bits) · <a href="https://github.com/Hugo291/ollama-gui/releases">Toutes les versions</a></span>
+        <span lang="en">Free and open source (MIT) · macOS 14+ (Apple silicon and Intel) · Windows 10 and 11 (64-bit): version 2.2, no longer updated · <a href="https://github.com/Hugo291/ollama-gui/releases">All releases</a></span>
+        <span lang="fr">Gratuit et open source (MIT) · macOS 14+ (Apple silicon et Intel) · Windows 10 et 11 (64 bits) : version 2.2, sans mises à jour · <a href="https://github.com/Hugo291/ollama-gui/releases">Toutes les versions</a></span>
       </p>
-      <img class="shot" src="screenshots/models.png" alt="The Models page: installed models with their size, parameters and capabilities, and the details of the selected model" width="1600" height="994">
+      <img class="shot" src="screenshots/models.png" alt="The Models page: installed models with their size, parameters and capabilities, and the details of the selected model" width="1600" height="970">
     </div>
 
     <section id="features" class="alt">
       <div class="wrap">
         <h2><span lang="en">Everything about your models, in one place</span><span lang="fr">Tout sur vos modèles, au même endroit</span></h2>
         <p class="lead">
-          <span lang="en">Ollama GUI talks to the Ollama REST API of this computer or of any server on your network.</span>
-          <span lang="fr">Ollama GUI utilise l'API REST d'Ollama sur cet ordinateur ou sur n'importe quel serveur de votre réseau.</span>
+          <span lang="en">Ollama GUI talks to the Ollama REST API of this Mac or of any server on your network.</span>
+          <span lang="fr">Ollama GUI utilise l'API REST d'Ollama sur ce Mac ou sur n'importe quel serveur de votre réseau.</span>
         </p>
         <div class="grid">
           <div class="card">
@@ -197,14 +197,14 @@
       <div class="wrap">
         <h2><span lang="en">A closer look</span><span lang="fr">En images</span></h2>
         <p class="lead">
-          <span lang="en">Native-looking on each platform, in light and dark mode, in English and French.</span>
-          <span lang="fr">Un rendu natif sur chaque plateforme, en mode clair et sombre, en français et en anglais.</span>
+          <span lang="en">A native Mac app, in light and dark appearance, in English and French.</span>
+          <span lang="fr">Une app Mac native, en apparence claire et sombre, en français et en anglais.</span>
         </p>
         <div class="gallery">
-          <figure><img src="screenshots/running.png" alt="Models loaded in memory" loading="lazy" width="1600" height="994"><figcaption><span lang="en">Models in memory</span><span lang="fr">Modèles en mémoire</span></figcaption></figure>
-          <figure><img src="screenshots/discover.png" alt="The ollama.com library" loading="lazy" width="1600" height="994"><figcaption><span lang="en">The ollama.com library</span><span lang="fr">La bibliothèque ollama.com</span></figcaption></figure>
-          <figure><img src="screenshots/playground.png" alt="The Playground" loading="lazy" width="1600" height="994"><figcaption><span lang="en">Playground</span><span lang="fr">Bac à sable</span></figcaption></figure>
-          <figure><img src="screenshots/downloads.png" alt="A download in progress" loading="lazy" width="1600" height="994"><figcaption><span lang="en">Downloads</span><span lang="fr">Téléchargements</span></figcaption></figure>
+          <figure><img src="screenshots/running.png" alt="Models loaded in memory" loading="lazy" width="1600" height="970"><figcaption><span lang="en">Models in memory</span><span lang="fr">Modèles en mémoire</span></figcaption></figure>
+          <figure><img src="screenshots/discover.png" alt="The ollama.com library" loading="lazy" width="1600" height="970"><figcaption><span lang="en">The ollama.com library</span><span lang="fr">La bibliothèque ollama.com</span></figcaption></figure>
+          <figure><img src="screenshots/playground.png" alt="The Playground" loading="lazy" width="1600" height="970"><figcaption><span lang="en">Playground</span><span lang="fr">Bac à sable</span></figcaption></figure>
+          <figure><img src="screenshots/dark.png" alt="The Models page in dark appearance" loading="lazy" width="1600" height="970"><figcaption><span lang="en">Dark appearance</span><span lang="fr">Apparence sombre</span></figcaption></figure>
         </div>
       </div>
     </section>
@@ -225,9 +225,9 @@
             </ol>
           </div>
           <div class="card">
-            <h3>Windows</h3>
+            <h3>Windows <small>(version 2.2)</small></h3>
             <ol>
-              <li><span lang="en">Run <a href="https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-Windows-Setup.exe">OllamaGUI-Windows-Setup.exe</a>. No administrator rights needed.</span><span lang="fr">Lancez <a href="https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-Windows-Setup.exe">OllamaGUI-Windows-Setup.exe</a>. Aucun droit administrateur requis.</span></li>
+              <li><span lang="en">Run <a href="https://github.com/Hugo291/ollama-gui/releases/download/v2.2.0/OllamaGUI-Windows-Setup.exe">OllamaGUI-Windows-Setup.exe</a>. No administrator rights needed. Version 2.2 stays available but is no longer updated.</span><span lang="fr">Lancez <a href="https://github.com/Hugo291/ollama-gui/releases/download/v2.2.0/OllamaGUI-Windows-Setup.exe">OllamaGUI-Windows-Setup.exe</a>. Aucun droit administrateur requis. La version 2.2 reste disponible, sans mises à jour.</span></li>
               <li><span lang="en">The installer is not code-signed: if SmartScreen warns you, choose <b>More info → Run anyway</b>.</span><span lang="fr">L'installeur n'est pas signé : si SmartScreen s'affiche, choisissez <b>Informations complémentaires → Exécuter quand même</b>.</span></li>
             </ol>
           </div>
@@ -242,7 +242,7 @@
         <span lang="en">MIT License · An independent project, not affiliated with Ollama · <a href="https://github.com/Hugo291/ollama-gui">Source code</a></span>
         <span lang="fr">Licence MIT · Un projet indépendant, sans lien avec Ollama · <a href="https://github.com/Hugo291/ollama-gui">Code source</a></span>
       </div>
-      <a class="slint" href="https://slint.dev" aria-label="Made with Slint">
+      <a class="slint" href="https://slint.dev" aria-label="Windows version made with Slint">
         <img class="light-logo" src="https://raw.githubusercontent.com/slint-ui/slint/master/logo/MadeWithSlint-logo-light.svg" alt="Made with Slint">
         <img class="dark-logo" src="https://raw.githubusercontent.com/slint-ui/slint/master/logo/MadeWithSlint-logo-dark.svg" alt="Made with Slint">
       </a>

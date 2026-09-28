@@ -15,9 +15,9 @@ import SwiftUI
 /// read or written); `OLLAMA_GUI_V2_SETTINGS` points the version 2 import at a test file.
 /// Commands: `wait:seconds`, `section:name`, `select:name[,name…]`, `select-all`,
 /// `search:text`, `filter:all|local|cloud|vision|tools|thinking|embedding|image`, `reveal:name`,
-/// `discover-search:text`, `discover-more`, `load:model`, `thinking:on|off`, `send`, `wait-reply`,
+/// `discover-search:text`, `discover-select:library/name`, `discover-more`, `load:model`, `thinking:on|off`, `send`, `wait-reply`,
 /// `delete-selection`, `cancel-dialogs`, `appearance:system|light|dark`, `size:width,height`,
-/// `chat:model`, `draft:text`, `markdown-sample`, `inspector`, `shot:name`, `print`, `quit`.
+/// `chat:model`, `draft:text`, `markdown-sample`, `settings[:servers|general|off]`, `shot:name`, `print`, `quit`.
 @MainActor
 enum ScriptDriver {
     static var script: String? { ProcessInfo.processInfo.environment["OLLAMA_GUI_SCRIPT"] }
@@ -80,6 +80,8 @@ enum ScriptDriver {
             app.reveal(argument)
         case "discover-search":
             app.discover.query = argument
+        case "discover-select":
+            app.discover.selection = argument
         case "discover-more":
             app.discover.loadMore()
         case "select-all":
@@ -121,6 +123,10 @@ enum ScriptDriver {
         case "markdown-sample":
             app.playground.messages.append(PlaygroundMessage(role: .user, content: "Compare two models in a table."))
             app.playground.messages.append(PlaygroundMessage(role: .assistant, content: markdownSample, model: app.playground.modelName))
+        case "settings":
+            // The Settings window doesn't open in the background: show its content here.
+            app.debugSettingsTab = SettingsView.Tab(rawValue: argument) ?? .servers
+            app.debugShowsSettings = argument != "off"
         case "shot":
             await shot(argument)
         case "print":

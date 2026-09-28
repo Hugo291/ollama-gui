@@ -5,13 +5,13 @@
 <h1 align="center">Ollama GUI</h1>
 
 <p align="center">
-  A desktop app for <b>macOS</b> and <b>Windows</b> to manage your <a href="https://ollama.com">Ollama</a> models.<br>
+  A native macOS app to manage your <a href="https://ollama.com">Ollama</a> models.<br>
   Browse, pull, update, inspect, load, customize and test models without the terminal.
 </p>
 
 <p align="center">
   <a href="https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-macOS.zip"><b>Download for macOS</b></a> ·
-  <a href="https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-Windows-Setup.exe"><b>Download for Windows</b></a> ·
+  <a href="https://github.com/Hugo291/ollama-gui/releases/download/v2.2.0/OllamaGUI-Windows-Setup.exe">Windows (version 2.2)</a> ·
   <a href="https://hugo291.github.io/ollama-gui/">Website</a> ·
   <a href="#français">Français</a>
 </p>
@@ -22,29 +22,29 @@
 
 **Models**
 - Every installed model with its size, parameters, quantization, capabilities (vision, tools, thinking, embedding, image, audio) and cloud or local origin. Sortable, searchable, filterable.
-- **Multiple selection** like a Finder or Explorer list (⌘-click, Shift-click, ⇧↑/⇧↓, ⌘A) to update, unload or delete several models at once.
+- **Multiple selection** (⌘-click, Shift-click, ⌘A) to update, unload or delete several models at once.
 - Inspector with the full configuration: parameters, system prompt, template, Modelfile, license, model info and tensors.
 - **Update check** against the Ollama registry (compares manifest digests, nothing is downloaded) and one-click update of one or all outdated models.
 - Duplicate, rename, **customize** (a new model on top of an existing one, with its own system prompt, temperature, context window, top P and seed) and delete.
 
 **Downloads and library**
 - Pull any model (`gemma3`, `qwen3:8b`, `hf.co/…`) with live progress, speed and time remaining; cancel and retry.
-- **Discover** the ollama.com library: search, filter by capability, sort by popularity or date, browse every tag with its size and context window, and pull in one click.
+- **Discover** the ollama.com library: search, filter by capability, sort by popularity or date, scroll through every result, browse every tag with its size and context window, and pull in one click.
 
 **Memory**
 - Loaded models with memory used, CPU/GPU split, context size and a countdown to unload.
 - Load, unload or keep a model loaded longer. Models are never pinned in memory forever: the app always sends a finite keep-alive (5 minutes by default, 1 minute to 1 hour in Settings).
 
 **Playground**
-- Streaming chat to try a model, with tokens per second, token count and load time. Replies are rendered as Markdown, with code blocks and tables.
+- Streaming chat to try a model, with tokens per second, token count and load time. Replies are rendered as Markdown, with code blocks, lists and tables.
 - Reasoning output for thinking models, image attachments for vision models, system prompt, temperature and context window.
 
 **And also**
-- Several Ollama servers (this computer, a machine on your network, a remote host) with a quick switcher.
-- Menu bar icon (macOS) or notification area icon (Windows) with the loaded models and active downloads.
-- Resizable sidebar, inspector, Discover list and table columns (double-click a divider to reset); the layout is remembered.
-- Light and dark themes, English and French.
-- Keyboard shortcuts: ⌘1–⌘6 pages, ⌘N pull a model, ⌘R refresh, ⇧⌘U check for updates, ⌘↩ chat with the selected model, ⌘D duplicate, ⌘⌫ delete, ↑/↓ to move in the list, ⇧↑/⇧↓ to extend the selection, ⌘A select all, Return to send in the Playground (Ctrl instead of ⌘ on Windows).
+- Several Ollama servers (this Mac, a machine on your network, a remote host) with a quick switcher.
+- Menu bar item with the loaded models and active downloads.
+- Resizable sidebar, inspector, Discover list and table columns; right-click the column titles to hide or show columns.
+- Light and dark appearance, English and French.
+- Keyboard shortcuts: ⌘1–⌘5 sections, ⌘N pull a model, ⌘R refresh, ⇧⌘U check for updates, ⌘↩ chat with the selected model, ⌘D duplicate, ⌘⌫ delete, ⌘A select all, ⌘. stop generating, ⌘, settings.
 
 | Running models | Discover | Playground |
 | --- | --- | --- |
@@ -52,9 +52,8 @@
 
 ## Install
 
-Install and start [Ollama](https://ollama.com/download) first, on this computer or on a machine the app can reach.
+Install and start [Ollama](https://ollama.com/download) first, on this Mac or on a machine the app can reach.
 
-**macOS** (11 Big Sur or later, Apple silicon or Intel)
 1. Download [`OllamaGUI-macOS.zip`](https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-macOS.zip), unzip it and move **Ollama GUI** to your Applications folder.
 2. The app is signed ad hoc, not notarized: the first time, right-click it and choose **Open**, or run:
 
@@ -62,34 +61,34 @@ Install and start [Ollama](https://ollama.com/download) first, on this computer 
 xattr -dr com.apple.quarantine "/Applications/Ollama GUI.app"
 ```
 
-**Windows** (10 or 11, 64-bit)
-1. Download and run [`OllamaGUI-Windows-Setup.exe`](https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-Windows-Setup.exe). It installs for the current user, no administrator rights needed.
-2. The installer is not code-signed: if SmartScreen warns you, choose **More info → Run anyway**.
+Requires macOS 14 Sonoma or later, on Apple silicon or Intel.
 
-A portable `OllamaGUI-Windows-Portable.exe` is also attached to each [release](https://github.com/Hugo291/ollama-gui/releases/latest).
+### Windows
+
+Version 2.2, written in Rust with [Slint](https://slint.dev), also runs on Windows 10 and 11 (64-bit). It stays available but is no longer updated:
+[`OllamaGUI-Windows-Setup.exe`](https://github.com/Hugo291/ollama-gui/releases/download/v2.2.0/OllamaGUI-Windows-Setup.exe) (installer, no administrator rights needed) or [`OllamaGUI-Windows-Portable.exe`](https://github.com/Hugo291/ollama-gui/releases/download/v2.2.0/OllamaGUI-Windows-Portable.exe). The installer is not code-signed: if SmartScreen warns you, choose **More info → Run anyway**. Its source code is in [`legacy/rust-slint`](legacy/rust-slint).
 
 ## Build from source
-
-Requires [Rust](https://rustup.rs) 1.88 or later.
 
 ```bash
 git clone https://github.com/Hugo291/ollama-gui.git
 cd ollama-gui
-cargo run --release
+scripts/build-app.sh
 ```
 
-Run the tests:
+This builds a universal `dist/Ollama GUI.app` and `dist/OllamaGUI-macOS.zip`. Use `ARCHS=arm64 scripts/build-app.sh` for a faster Apple silicon-only build.
+
+Run the unit tests and the localization check:
 
 ```bash
-cargo test
+scripts/test.sh
 ```
 
-Packaging:
-- macOS: `scripts/build-macos.sh` builds a universal `dist/Ollama GUI.app` and `dist/OllamaGUI-macOS.zip`.
-- Windows: `cargo build --release` embeds the icon in `ollama-gui.exe`; `iscc packaging\windows\installer.iss` ([Inno Setup](https://jrsoftware.org/isinfo.php)) builds the installer.
-- CI builds, tests and smoke-tests both platforms on every push, and attaches the builds to the release when a `v*` tag is pushed.
+Xcode is not required: the Swift toolchain of the Command Line Tools is enough. Since the macOS 27 SDK, SwiftUI's `@State` is a macro whose compiler plugin only ships with Xcode, so with the Command Line Tools alone the scripts build against the newest installed SDK that doesn't need it (`scripts/sdk.sh`).
 
-Translations live in `lang/<language>/LC_MESSAGES/ollama-gui.po`. After changing interface strings, run `scripts/update-po.py` to add new strings to the French file (it lists the ones left to translate). Strings composed in Rust are in `src/app/text.rs`.
+Translations live in `Resources/<language>.lproj`. `scripts/check-l10n.py` lists the interface strings that a translation is missing.
+
+CI builds, tests and smoke-tests the app on every push, and attaches the build to the release when a `v*` tag is pushed.
 
 ## How it works
 
@@ -100,12 +99,11 @@ Translations live in `lang/<language>/LC_MESSAGES/ollama-gui.po`. After changing
 
 | Path | Content |
 | --- | --- |
-| `src/api` | Ollama API client, registry update checks, ollama.com parser, formatting (unit tested) |
-| `src/app` | Controller: state, refresh, downloads, Discover, Playground, Markdown rendering, tray icon |
-| `ui` | Interface in [Slint](https://slint.dev): native-looking widgets on each platform (Cupertino on macOS, Fluent on Windows) |
-| `lang` | Translations (gettext) |
-| `packaging` | macOS `Info.plist` and icon, Windows icon and installer script |
-| `legacy/macos-swift` | Version 1, a SwiftUI app for macOS |
+| `Sources/OllamaKit` | Ollama API client, registry update checks, ollama.com parser, Markdown blocks (unit tested) |
+| `Sources/OllamaGUI` | SwiftUI app |
+| `Resources` | `Info.plist`, icon, English and French strings |
+| `scripts` | build, test, icon and localization scripts |
+| `legacy/rust-slint` | Version 2, in Rust and Slint, for macOS and Windows (no longer updated) |
 
 ## Privacy
 
@@ -113,16 +111,16 @@ No analytics, no account. The app only talks to the Ollama servers you configure
 
 ## Français
 
-**Ollama GUI** est une app pour macOS et Windows qui gère vos modèles Ollama : liste des modèles installés (taille, paramètres, quantification, capacités), détails complets, **recherche de mises à jour** sur le registre Ollama, téléchargement avec progression, bibliothèque ollama.com (recherche, tags, téléchargement en un clic), modèles en mémoire (chargement, déchargement, compte à rebours), duplication, renommage, **personnalisation** (prompt système et paramètres), suppression, **sélection multiple** (⌘-clic, Maj-clic, ⌘A) pour mettre à jour, décharger ou supprimer plusieurs modèles d'un coup, et un **bac à sable** pour discuter avec un modèle et mesurer sa vitesse. Plusieurs serveurs, icône dans la barre des menus (macOS) ou la zone de notification (Windows), panneaux et colonnes redimensionnables, thèmes clair et sombre, raccourcis clavier (⌘1–⌘6, ⌘N, ⌘R, ⇧⌘U, ⌘↩, ⌘D, ⌘⌫, ⌘A ; Ctrl sous Windows), interface en français et en anglais.
+**Ollama GUI** est une app macOS native pour gérer vos modèles Ollama : liste des modèles installés (taille, paramètres, quantification, capacités), **sélection multiple** (⌘-clic, Maj-clic, ⌘A) pour mettre à jour, décharger ou supprimer plusieurs modèles d'un coup, détails complets, **recherche de mises à jour** sur le registre Ollama, téléchargement avec progression, bibliothèque ollama.com (recherche, tags, téléchargement en un clic), modèles en mémoire (chargement, déchargement, compte à rebours), duplication, renommage, **personnalisation** (prompt système et paramètres), suppression, et un **bac à sable** pour discuter avec un modèle et mesurer sa vitesse. Plusieurs serveurs, icône dans la barre des menus, apparence claire ou sombre, raccourcis clavier (⌘1–⌘5, ⌘N, ⌘R, ⇧⌘U, ⌘↩, ⌘D, ⌘⌫, ⌘A), interface en français et en anglais.
 
-Installation :
-- **macOS** : téléchargez [`OllamaGUI-macOS.zip`](https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-macOS.zip), dézippez, glissez l'app dans Applications, puis clic droit → **Ouvrir** au premier lancement (app non notarisée).
-- **Windows** : lancez [`OllamaGUI-Windows-Setup.exe`](https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-Windows-Setup.exe) (sans droits administrateur). Si SmartScreen s'affiche : **Informations complémentaires → Exécuter quand même**.
+Installation : téléchargez [`OllamaGUI-macOS.zip`](https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-macOS.zip), dézippez, glissez l'app dans Applications, puis clic droit → **Ouvrir** au premier lancement (app non notarisée). macOS 14 Sonoma ou plus récent.
+
+Windows : la version 2.2 (Rust et Slint) reste disponible, sans mises à jour : [`OllamaGUI-Windows-Setup.exe`](https://github.com/Hugo291/ollama-gui/releases/download/v2.2.0/OllamaGUI-Windows-Setup.exe).
 
 ## License
 
 [MIT](LICENSE). Ollama GUI is an independent project, not affiliated with Ollama.
 
-The interface is built with [Slint](https://slint.dev), used under the Slint Royalty-free License.
+The Windows version 2.2 is built with [Slint](https://slint.dev), used under the Slint Royalty-free License.
 
 <a href="https://slint.dev"><img src="https://raw.githubusercontent.com/slint-ui/slint/master/logo/MadeWithSlint-logo-light.svg" alt="Made with Slint" height="56"></a>

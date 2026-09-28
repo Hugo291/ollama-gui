@@ -305,26 +305,26 @@ private struct LibraryModelDetail: View {
                             }
                         }
                     }
-                    .width(min: 120, ideal: 200)
+                    .width(min: 100, ideal: 150)
                     TableColumn("Size") { tag in
                         Text(verbatim: tag.size.map { LibraryText.size($0, french: app.discover.french) } ?? "—")
                             .monospacedDigit()
                             .help(Text(verbatim: tag.size.map { LibraryText.size($0, french: app.discover.french) } ?? ""))
                     }
-                    .width(min: 60, ideal: 110)
+                    .width(min: 56, ideal: 76)
                     TableColumn("Context") { tag in
                         Text(verbatim: shortContext(tag.context))
                     }
-                    .width(min: 50, ideal: 70)
+                    .width(min: 44, ideal: 60)
                     TableColumn("Input") { tag in
                         Text(verbatim: tag.input.map { LibraryText.input($0, french: app.discover.french) } ?? "—")
                             .foregroundStyle(.secondary)
                     }
-                    .width(min: 60, ideal: 120)
+                    .width(min: 56, ideal: 90)
                     TableColumn("") { tag in
                         TagAction(tag: tag)
                     }
-                    .width(min: 90, ideal: 100)
+                    .width(min: 104, ideal: 112)
                 }
             }
         }

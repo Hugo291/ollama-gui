@@ -2,14 +2,26 @@ import OllamaKit
 import SwiftUI
 
 struct SettingsView: View {
+    enum Tab: String {
+        case servers
+        case general
+    }
+
+    @State private var tab = Tab.servers
+
     var body: some View {
-        TabView {
+        TabView(selection: $tab) {
             ServersSettingsView()
                 .tabItem { Label("Servers", systemImage: "server.rack") }
+                .tag(Tab.servers)
             GeneralSettingsView()
                 .tabItem { Label("General", systemImage: "gearshape") }
+                .tag(Tab.general)
         }
         .frame(width: 600, height: 460)
+        #if DEBUG
+        .onAppear { tab = AppModel.shared.debugSettingsTab }
+        #endif
     }
 }
 

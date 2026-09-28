@@ -49,6 +49,20 @@ struct ContentView: View {
 
     @ViewBuilder
     private var detail: some View {
+        #if DEBUG
+        if app.debugShowsSettings {
+            SettingsView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            sectionView
+        }
+        #else
+        sectionView
+        #endif
+    }
+
+    @ViewBuilder
+    private var sectionView: some View {
         switch app.section ?? .models {
         case .models: ModelsView()
         case .running: RunningView()

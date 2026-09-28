@@ -22,12 +22,14 @@ struct LibraryTextTests {
     }
 
     @Test func englishValuesAreUnchanged() {
-        for value in ["2 weeks ago", "5.2GB", "Extra High Usage", "Text, Image input", "21.4M"] {
+        for value in ["2 weeks ago", "5.2GB", "Extra High Usage", "21.4M"] {
             #expect(LibraryText.age(value, french: false) == value)
             #expect(LibraryText.size(value, french: false) == value)
-            #expect(LibraryText.input(value, french: false) == value)
             #expect(LibraryText.count(value, french: false) == value)
         }
+        // The column is titled Input already.
+        #expect(LibraryText.input("Text, Image input", french: false) == "Text, Image")
+        #expect(LibraryText.input("Text", french: false) == "Text")
     }
 
     @Test func nextPageMarker() {

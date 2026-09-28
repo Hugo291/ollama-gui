@@ -96,6 +96,11 @@ final class AppModel {
     var createRequest: CreateRequest?
     var deleteRequest: DeleteRequest?
     var errorAlert: ErrorAlert?
+    #if DEBUG
+    /// Test driver: the settings, shown in the main window to capture them.
+    var debugShowsSettings = false
+    var debugSettingsTab = SettingsView.Tab.servers
+    #endif
 
     @ObservationIgnored private var detailsCache: [String: ModelShowResponse] = [:]
     @ObservationIgnored private var monitorTask: Task<Void, Never>?

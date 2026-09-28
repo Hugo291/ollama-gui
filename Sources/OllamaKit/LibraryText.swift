@@ -58,11 +58,12 @@ public enum LibraryText {
         return "il y a \(number) \(french)"
     }
 
-    /// Inputs of a tag: `Text, Image input` → `Texte, image`.
+    /// Inputs of a tag, shown under an "Input" title: `Text, Image input` → `Text, Image`,
+    /// or `Texte, image` in French.
     public static func input(_ value: String, french: Bool) -> String {
-        guard french else { return value }
         var text = value.trimmingCharacters(in: .whitespaces)
         if text.lowercased().hasSuffix(" input") { text.removeLast(" input".count) }
+        guard french else { return text }
         let names = ["text": "texte", "image": "image", "audio": "audio", "video": "vidéo", "file": "fichier"]
         let parts = text.split(separator: ",").map { part -> String in
             let word = part.trimmingCharacters(in: .whitespaces).lowercased()
