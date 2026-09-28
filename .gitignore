@@ -5,3 +5,4 @@
 /target
 *.xcodeproj
 xcuserdata/
+__pycache__/
