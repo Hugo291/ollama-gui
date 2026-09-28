@@ -52,6 +52,7 @@ struct ContentView: View {
         #if DEBUG
         if app.debugShowsSettings {
             SettingsView()
+                .id(app.debugSettingsTab)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             sectionView
