@@ -3,7 +3,7 @@ import { Theme } from "theme.slint";
 import { Icons } from "icons.slint";
 import { Api, LibraryRow, TagRow } from "api.slint";
 import {
-    Icon, Label, Badge, CapabilityBadge, ToolButton, SearchField, EmptyState, Divider, VDivider, Toolbar, MenuButton, MenuEntry
+    Icon, Label, Badge, CapabilityBadge, ToolButton, SearchField, EmptyState, Divider, VDivider, Toolbar, MenuButton, MenuEntry, Splitter
 } from "components.slint";
 
 export global LibraryFilters {
@@ -322,11 +322,13 @@ export component DiscoverPage inherits VerticalLayout {
         }
     }
     Divider { }
-    HorizontalLayout {
+    // The list is resizable; in a small window it still leaves room for the tags.
+    property <length> list-width: clamp(Api.library-width, 260px, max(260px, root.width - 380px));
+    Rectangle {
         vertical-stretch: 1;
+    HorizontalLayout {
         Rectangle {
-            // Narrower in a small window, leaving room for the tags.
-            width: clamp(root.width * 0.4, 280px, 380px);
+            width: root.list-width;
             if Api.library-error != "": EmptyState {
                 icon: Icons.offline;
                 title: @tr("Can't Reach ollama.com");
@@ -389,5 +391,15 @@ export component DiscoverPage inherits VerticalLayout {
                 message: @tr("Browse the Ollama library and pull models in one click.");
             }
         }
+    }
+    Splitter {
+        x: root.list-width - 3px;
+        height: parent.height;
+        size <=> Api.library-width;
+        minimum: 260px;
+        maximum: min(560px, root.width - 380px);
+        default-size: 380px;
+        resized => { Api.layout-changed(); }
+    }
     }
 }

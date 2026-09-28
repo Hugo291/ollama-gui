@@ -10,7 +10,7 @@ import { DiscoverPage } from "discover.slint";
 import { PlaygroundPage } from "playground.slint";
 import { SettingsPage } from "settings.slint";
 import { Dialogs, Toast } from "dialogs.slint";
-import { VDivider } from "components.slint";
+import { VDivider, Splitter } from "components.slint";
 import { Tray, TrayModel } from "tray.slint";
 
 export { Theme, Api, Palette, Tray, TrayModel }
@@ -33,7 +33,7 @@ export component AppWindow inherits Window {
         key-pressed(event) => { return root.navigation(event); }
     HorizontalLayout {
         Sidebar {
-            width: 232px;
+            width: Api.sidebar-width;
         }
         VDivider { }
         Rectangle {
@@ -45,6 +45,15 @@ export component AppWindow inherits Window {
             if Api.section == 4: PlaygroundPage { }
             if Api.section == 5: SettingsPage { }
         }
+    }
+    Splitter {
+        x: Api.sidebar-width - 3px;
+        height: parent.height;
+        size <=> Api.sidebar-width;
+        minimum: 190px;
+        maximum: 320px;
+        default-size: 232px;
+        resized => { Api.layout-changed(); }
     }
     }
     init => { shortcuts.focus(); }
@@ -69,11 +78,22 @@ export component AppWindow inherits Window {
             return reject;
         }
         if event.text == Key.UpArrow || event.text == Key.DownArrow {
-            Api.move-selection(event.text == Key.UpArrow ? -1 : 1);
+            Api.move-selection(event.text == Key.UpArrow ? -1 : 1, event.modifiers.shift);
             return accept;
         }
-        if (event.text == Key.Delete || (event.text == Key.Backspace && event.modifiers.control)) && Api.selected-model != "" {
-            Api.open-dialog(5, Api.selected-model);
+        if event.text == Key.Delete || (event.text == Key.Backspace && event.modifiers.control) {
+            if Api.selected-count > 1 {
+                Api.delete-selection();
+                return accept;
+            }
+            if Api.selected-model != "" {
+                Api.open-dialog(5, Api.selected-model);
+                return accept;
+            }
+        }
+        // ⌘A / Ctrl+A: a focused text field uses it first (select its text).
+        if (event.text == "a" || event.text == "A") && event.modifiers.control {
+            Api.select-all-models();
             return accept;
         }
         reject
@@ -103,7 +123,7 @@ export component AppWindow inherits Window {
             Api.check-updates();
             return accept;
         }
-        if Api.section == 0 && Api.selected-model != "" {
+        if Api.section == 0 && Api.selected-count == 1 {
             if event.text == Key.Return && Api.detail.can-chat {
                 Api.chat-with(Api.selected-model);
                 return accept;

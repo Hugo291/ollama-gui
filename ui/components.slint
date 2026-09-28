@@ -307,6 +307,76 @@ export component CodeDisclosure inherits VerticalLayout {
     }
 }
 
+// Main button of a destructive action (Delete), red like on macOS and Windows.
+export component DangerButton inherits Rectangle {
+    in property <string> text;
+    callback clicked();
+    min-width: label.preferred-width + 28px;
+    min-height: 24px;
+    border-radius: Theme.control-radius;
+    background: touch.pressed ? Theme.red.darker(0.25) : Theme.red;
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-action-default => { root.clicked(); }
+    label := Text {
+        text: root.text;
+        color: #ffffff;
+        font-size: Theme.font-size;
+        font-weight: 600;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+}
+
+// Draggable edge between two panes, placed over their divider. `size` is the width of the
+// pane it resizes (`reversed` when that pane is on the right). Double-click restores the
+// default width; `resized` is called on release, to save the layout.
+export component Splitter inherits Rectangle {
+    in-out property <length> size;
+    in property <length> minimum;
+    in property <length> maximum;
+    in property <length> default-size;
+    in property <bool> reversed;
+    // A faint line in the middle, for table headers (panes have their own divider).
+    in property <bool> show-line;
+    callback resized();
+    width: 7px;
+    if root.show-line: Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: parent.height * 0.25;
+        width: 1px;
+        height: parent.height * 0.5;
+        background: Theme.divider;
+    }
+    // Size and pointer position (in the window) when the drag started: the edge can jump
+    // while dragging (a table switching to compact columns), the pointer can't.
+    property <length> start-size;
+    property <length> start-x;
+    TouchArea {
+        mouse-cursor: col-resize;
+        moved => {
+            root.size = clamp(root.start-size + (root.reversed ? -1 : 1) * (self.absolute-position.x + self.mouse-x - root.start-x), root.minimum, root.maximum);
+        }
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down {
+                // From the width shown: a saved width too large for the window is shown clamped.
+                root.start-size = clamp(root.size, root.minimum, root.maximum);
+                root.start-x = self.absolute-position.x + self.mouse-x;
+            }
+            if event.kind == PointerEventKind.up {
+                root.resized();
+            }
+        }
+        double-clicked => {
+            root.size = clamp(root.default-size, root.minimum, root.maximum);
+            root.resized();
+        }
+    }
+}
+
 export component Divider inherits Rectangle {
     height: 1px;
     background: Theme.divider;

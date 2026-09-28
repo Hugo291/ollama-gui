@@ -36,7 +36,7 @@ msgstr "Audio"
 msgid "Insert"
 msgstr "Insertion"
 
-#: ui/components.slint:73 ui/discover.slint:15 ui/models.slint:13 ui/models.slint:327
+#: ui/components.slint:73 ui/discover.slint:15 ui/models.slint:13 ui/models.slint:459
 msgid "Cloud"
 msgstr "Cloud"
 
@@ -44,135 +44,131 @@ msgstr "Cloud"
 msgid "Clear"
 msgstr "Effacer"
 
-#: ui/components.slint:268 ui/models.slint:452 ui/playground.slint:153
+#: ui/components.slint:268 ui/models.slint:584 ui/playground.slint:153
 msgid "Copy"
 msgstr "Copier"
 
-#: ui/dialogs.slint:110
+#: ui/dialogs.slint:86
 msgid "Pull a Model"
 msgstr "Télécharger un modèle"
 
-#: ui/dialogs.slint:111
+#: ui/dialogs.slint:87
 msgid "Enter the name of a model from the Ollama library, optionally followed by a tag."
 msgstr "Saisissez le nom d’un modèle de la bibliothèque Ollama, éventuellement suivi d’un tag."
 
-#: ui/dialogs.slint:119 ui/dialogs.slint:185 ui/dialogs.slint:262
+#: ui/dialogs.slint:95 ui/dialogs.slint:161 ui/dialogs.slint:238
 msgid "This isn't a valid model name."
 msgstr "Ce nom de modèle n’est pas valide."
 
-#: ui/dialogs.slint:120
+#: ui/dialogs.slint:96
 msgid "Already installed: pulling it again updates it to the latest version."
 msgstr "Déjà installé : le télécharger à nouveau le met à jour vers la dernière version."
 
-#: ui/dialogs.slint:121
+#: ui/dialogs.slint:97
 msgid "Examples: gemma3, qwen3:8b, hf.co/unsloth/Qwen3-8B-GGUF:Q4_K_M"
 msgstr "Exemples : gemma3, qwen3:8b, hf.co/unsloth/Qwen3-8B-GGUF:Q4_K_M"
 
-#: ui/dialogs.slint:126
+#: ui/dialogs.slint:102
 msgid "Browse the Library…"
 msgstr "Parcourir la bibliothèque…"
 
-#: ui/dialogs.slint:134 ui/dialogs.slint:200 ui/dialogs.slint:316 ui/dialogs.slint:353 ui/discover.slint:103 ui/downloads.slint:59 ui/settings.slint:167
+#: ui/dialogs.slint:110 ui/dialogs.slint:176 ui/dialogs.slint:292 ui/dialogs.slint:330 ui/discover.slint:103 ui/downloads.slint:59 ui/settings.slint:167
 msgid "Cancel"
 msgstr "Annuler"
 
-#: ui/dialogs.slint:138 ui/discover.slint:121
+#: ui/dialogs.slint:114 ui/discover.slint:121
 msgid "Pull"
 msgstr "Télécharger"
 
-#: ui/dialogs.slint:158
+#: ui/dialogs.slint:134
 msgid "Rename Model"
 msgstr "Renommer le modèle"
 
-#: ui/dialogs.slint:158
+#: ui/dialogs.slint:134
 msgid "Duplicate Model"
 msgstr "Dupliquer le modèle"
 
-#: ui/dialogs.slint:161
+#: ui/dialogs.slint:137
 msgid "Ollama has no rename: the model is copied under the new name, then the original name is removed. No data is downloaded again."
 msgstr "Ollama ne sait pas renommer : le modèle est copié sous le nouveau nom, puis l’ancien nom est supprimé. Aucune donnée n’est retéléchargée."
 
-#: ui/dialogs.slint:162
+#: ui/dialogs.slint:138
 msgid "The copy shares its data with the original, so it takes no extra disk space. Useful to give a model a shorter name."
 msgstr "La copie partage ses données avec l’original : elle n’occupe aucun espace disque supplémentaire. Pratique pour donner un nom plus court à un modèle."
 
-#: ui/dialogs.slint:166
+#: ui/dialogs.slint:142
 msgid "Model"
 msgstr "Modèle"
 
-#: ui/dialogs.slint:177
+#: ui/dialogs.slint:153
 msgid "New name"
 msgstr "Nouveau nom"
 
-#: ui/dialogs.slint:186 ui/dialogs.slint:263
+#: ui/dialogs.slint:162 ui/dialogs.slint:239
 msgid "Choose a different name."
 msgstr "Choisissez un autre nom."
 
-#: ui/dialogs.slint:187 ui/dialogs.slint:264
+#: ui/dialogs.slint:163 ui/dialogs.slint:240
 msgid "A model with this name already exists and will be replaced."
 msgstr "Un modèle portant ce nom existe déjà et sera remplacé."
 
-#: ui/dialogs.slint:204
+#: ui/dialogs.slint:180
 msgid "Rename"
 msgstr "Renommer"
 
-#: ui/dialogs.slint:204
+#: ui/dialogs.slint:180
 msgid "Duplicate"
 msgstr "Dupliquer"
 
-#: ui/dialogs.slint:240
+#: ui/dialogs.slint:216
 msgid "Customize a Model"
 msgstr "Personnaliser un modèle"
 
-#: ui/dialogs.slint:242
+#: ui/dialogs.slint:218
 msgid "Creates a new model on top of an existing one, with its own system prompt and parameters. The weights are shared, so it takes almost no disk space."
 msgstr "Crée un nouveau modèle à partir d’un modèle existant, avec son propre prompt système et ses propres paramètres. Les poids sont partagés : il n’occupe presque aucun espace disque."
 
-#: ui/dialogs.slint:245
+#: ui/dialogs.slint:221
 msgid "Based on"
 msgstr "Basé sur"
 
-#: ui/dialogs.slint:254 ui/models.slint:258 ui/settings.slint:123
+#: ui/dialogs.slint:230 ui/models.slint:295 ui/settings.slint:123
 msgid "Name"
 msgstr "Nom"
 
-#: ui/dialogs.slint:266 ui/playground.slint:173
+#: ui/dialogs.slint:242 ui/playground.slint:173
 msgid "System Prompt"
 msgstr "Prompt système"
 
-#: ui/dialogs.slint:272 ui/models.slint:259
+#: ui/dialogs.slint:248 ui/models.slint:296
 msgid "Parameters"
 msgstr "Paramètres"
 
-#: ui/dialogs.slint:273
+#: ui/dialogs.slint:249
 msgid "Temperature"
 msgstr "Température"
 
-#: ui/dialogs.slint:283 ui/playground.slint:199
+#: ui/dialogs.slint:259 ui/playground.slint:199
 msgid "Context window"
 msgstr "Fenêtre de contexte"
 
-#: ui/dialogs.slint:288
+#: ui/dialogs.slint:264
 msgid "Top P"
 msgstr "Top P"
 
-#: ui/dialogs.slint:298
+#: ui/dialogs.slint:274
 msgid "Fixed seed"
 msgstr "Graine fixe"
 
-#: ui/dialogs.slint:320
+#: ui/dialogs.slint:296
 msgid "Create"
 msgstr "Créer"
 
-#: ui/dialogs.slint:347
-msgid "Delete “{}”?"
-msgstr "Supprimer « {} » ?"
-
-#: ui/dialogs.slint:357
+#: ui/dialogs.slint:334
 msgid "Delete"
 msgstr "Supprimer"
 
-#: ui/dialogs.slint:402
+#: ui/dialogs.slint:379
 msgid "Close"
 msgstr "Fermer"
 
@@ -188,7 +184,7 @@ msgstr "Installé"
 msgid "Tag"
 msgstr "Tag"
 
-#: ui/discover.slint:138 ui/models.slint:261
+#: ui/discover.slint:138 ui/models.slint:298
 msgid "Size"
 msgstr "Taille"
 
@@ -212,7 +208,7 @@ msgstr "Filtrer les tags"
 msgid "Can't Load Tags"
 msgstr "Impossible de charger les tags"
 
-#: ui/discover.slint:269 ui/discover.slint:337
+#: ui/discover.slint:269 ui/discover.slint:339
 msgid "Try Again"
 msgstr "Réessayer"
 
@@ -232,19 +228,19 @@ msgstr "Récents"
 msgid "Search models on ollama.com"
 msgstr "Rechercher des modèles sur ollama.com"
 
-#: ui/discover.slint:332
+#: ui/discover.slint:334
 msgid "Can't Reach ollama.com"
 msgstr "ollama.com est injoignable"
 
-#: ui/discover.slint:353 ui/models.slint:569
+#: ui/discover.slint:355 ui/models.slint:706
 msgid "No Results"
 msgstr "Aucun résultat"
 
-#: ui/discover.slint:388 ui/downloads.slint:116 ui/models.slint:562
+#: ui/discover.slint:390 ui/downloads.slint:116 ui/models.slint:699
 msgid "Discover Models"
 msgstr "Découvrir des modèles"
 
-#: ui/discover.slint:389
+#: ui/discover.slint:391
 msgid "Browse the Ollama library and pull models in one click."
 msgstr "Parcourez la bibliothèque Ollama et téléchargez des modèles en un clic."
 
@@ -268,7 +264,7 @@ msgstr "Téléchargements"
 msgid "Remove finished downloads from the list"
 msgstr "Retirer les téléchargements terminés de la liste"
 
-#: ui/downloads.slint:93 ui/models.slint:512
+#: ui/downloads.slint:93 ui/models.slint:644
 msgid "Pull a model from the Ollama library"
 msgstr "Télécharger un modèle depuis la bibliothèque Ollama"
 
@@ -280,7 +276,7 @@ msgstr "Aucun téléchargement"
 msgid "Models you pull or update appear here with their progress."
 msgstr "Les modèles que vous téléchargez ou mettez à jour apparaissent ici avec leur progression."
 
-#: ui/downloads.slint:110 ui/models.slint:557
+#: ui/downloads.slint:110 ui/models.slint:694
 msgid "Pull a Model…"
 msgstr "Télécharger un modèle…"
 
@@ -292,135 +288,135 @@ msgstr "Local"
 msgid "All Models"
 msgstr "Tous les modèles"
 
-#: ui/models.slint:102 ui/models.slint:337 ui/running.slint:82 ui/tray.slint:60
+#: ui/models.slint:105 ui/models.slint:469 ui/running.slint:82 ui/tray.slint:60
 msgid "Chat"
 msgstr "Discuter"
 
-#: ui/models.slint:107
+#: ui/models.slint:110 ui/models.slint:158
 msgid "Unload from Memory"
 msgstr "Décharger de la mémoire"
 
-#: ui/models.slint:111
+#: ui/models.slint:114
 msgid "Load into Memory"
 msgstr "Charger en mémoire"
 
-#: ui/models.slint:117 ui/models.slint:366 ui/models.slint:382
+#: ui/models.slint:120 ui/models.slint:498 ui/models.slint:514
 msgid "Update"
 msgstr "Mettre à jour"
 
-#: ui/models.slint:121 ui/models.slint:386
+#: ui/models.slint:124 ui/models.slint:518
 msgid "Duplicate…"
 msgstr "Dupliquer…"
 
-#: ui/models.slint:125 ui/models.slint:390
+#: ui/models.slint:128 ui/models.slint:522
 msgid "Rename…"
 msgstr "Renommer…"
 
-#: ui/models.slint:129 ui/models.slint:394
+#: ui/models.slint:132 ui/models.slint:526
 msgid "Customize…"
 msgstr "Personnaliser…"
 
-#: ui/models.slint:135 ui/models.slint:399
+#: ui/models.slint:138 ui/models.slint:531
 msgid "Copy Name"
 msgstr "Copier le nom"
 
-#: ui/models.slint:139 ui/models.slint:403
+#: ui/models.slint:142 ui/models.slint:535
 msgid "Open Model Page"
 msgstr "Ouvrir la page du modèle"
 
-#: ui/models.slint:145 ui/models.slint:408
+#: ui/models.slint:148 ui/models.slint:540
 msgid "Delete…"
 msgstr "Supprimer…"
 
-#: ui/models.slint:185
+#: ui/models.slint:207
 msgid "Loaded in memory"
 msgstr "Chargé en mémoire"
 
-#: ui/models.slint:199
+#: ui/models.slint:221
 msgid "Update available"
 msgstr "Mise à jour disponible"
 
-#: ui/models.slint:260
+#: ui/models.slint:297
 msgid "Quantization"
 msgstr "Quantification"
 
-#: ui/models.slint:262
+#: ui/models.slint:299
 msgid "Capabilities"
 msgstr "Capacités"
 
-#: ui/models.slint:263
+#: ui/models.slint:300
 msgid "Modified"
 msgstr "Modifié"
 
-#: ui/models.slint:328 ui/tray.slint:49
-msgid "In Memory"
-msgstr "En mémoire"
-
-#: ui/models.slint:329
-msgid "Update Available"
-msgstr "Mise à jour disponible"
-
-#: ui/models.slint:330
-msgid "Up to Date"
-msgstr "À jour"
-
-#: ui/models.slint:344 ui/running.slint:88 ui/tray.slint:64
+#: ui/models.slint:409 ui/models.slint:476 ui/running.slint:88 ui/tray.slint:64
 msgid "Unload"
 msgstr "Décharger"
 
-#: ui/models.slint:351
+#: ui/models.slint:460 ui/tray.slint:49
+msgid "In Memory"
+msgstr "En mémoire"
+
+#: ui/models.slint:461
+msgid "Update Available"
+msgstr "Mise à jour disponible"
+
+#: ui/models.slint:462
+msgid "Up to Date"
+msgstr "À jour"
+
+#: ui/models.slint:483
 msgid "Load"
 msgstr "Charger"
 
-#: ui/models.slint:380
+#: ui/models.slint:512
 msgid "More"
 msgstr "Plus"
 
-#: ui/models.slint:437
+#: ui/models.slint:569
 msgid "Digest"
 msgstr "Empreinte"
 
-#: ui/models.slint:482 ui/sidebar.slint:127
+#: ui/models.slint:614 ui/sidebar.slint:127
 msgid "Models"
 msgstr "Modèles"
 
-#: ui/models.slint:499
+#: ui/models.slint:631
 msgid "Update all outdated models"
 msgstr "Mettre à jour tous les modèles obsolètes"
 
-#: ui/models.slint:505
+#: ui/models.slint:637
 msgid "Check the Ollama registry for newer versions of your models"
 msgstr "Vérifier sur le registre Ollama si vos modèles ont des versions plus récentes"
 
-#: ui/models.slint:519
+#: ui/models.slint:651
 msgid "Show or hide model details"
 msgstr "Afficher ou masquer les détails du modèle"
 
-#: ui/models.slint:527
+#: ui/models.slint:659
 msgid "Filter models"
 msgstr "Filtrer les modèles"
 
-#: ui/models.slint:546 ui/playground.slint:242 ui/running.slint:131
+#: ui/models.slint:683 ui/playground.slint:242 ui/running.slint:131
 msgid "Ollama Is Not Reachable"
 msgstr "Ollama est injoignable"
 
-#: ui/models.slint:546 ui/playground.slint:242 ui/running.slint:131
+#: ui/models.slint:683 ui/playground.slint:242 ui/running.slint:131
 msgid "Connecting…"
 msgstr "Connexion…"
 
-#: ui/models.slint:551
+#: ui/models.slint:688
 msgid "No Models Yet"
 msgstr "Aucun modèle"
 
-#: ui/models.slint:552
+#: ui/models.slint:689
 msgid "Pull a model from the Ollama library to get started."
 msgstr "Téléchargez un modèle depuis la bibliothèque Ollama pour commencer."
 
-#: ui/models.slint:585
+#: ui/models.slint:722
 msgid "No Selection"
 msgstr "Aucune sélection"
 
-#: ui/models.slint:586
+#: ui/models.slint:723
 msgid "Select a model to see its details."
 msgstr "Sélectionnez un modèle pour voir ses détails."
 

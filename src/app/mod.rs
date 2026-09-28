@@ -11,6 +11,7 @@ mod macos;
 mod markdown;
 #[cfg(debug_assertions)]
 mod script;
+mod selection;
 mod text;
 mod tray;
 
@@ -30,6 +31,7 @@ use crate::api::registry::{self, UpdateStatus};
 use crate::settings::{KEEP_ALIVE_CHOICES, REFRESH_CHOICES, Server, Settings};
 use crate::{Api, AppWindow, DetailSection, Fact, ModelDetail, ModelRow, Palette, RunningRow, ServerItem, Theme, Tray};
 
+use selection::Selection;
 pub use text::Text;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -63,6 +65,10 @@ struct State {
     detail_loading: HashSet<String>,
     tick: u64,
     refreshing: bool,
+    /// Models selected in the Models table (one or several).
+    selection: Selection,
+    /// Models the Delete dialog is about.
+    pending_delete: Vec<String>,
 }
 
 pub struct App {
@@ -233,6 +239,8 @@ impl App {
                 detail_loading: HashSet::new(),
                 tick: 0,
                 refreshing: false,
+                selection: Selection::default(),
+                pending_delete: Vec::new(),
             }),
             downloads: RefCell::new(downloads::Downloads::default()),
             library: RefCell::new(library::Library::default()),
@@ -455,12 +463,6 @@ impl App {
             state.models = models;
             state.models_loaded = true;
         }
-        let ui = self.ui();
-        let api = ui.global::<Api>();
-        let selected = api.get_selected_model();
-        if !selected.is_empty() && !self.state.borrow().models.iter().any(|m| m.name == selected.as_str()) {
-            api.set_selected_model(SharedString::new());
-        }
         self.sync_models();
         self.sync_detail();
         // The models that can be loaded come from this list.
@@ -519,8 +521,9 @@ impl App {
             state.checking_updates = false;
             state.launch_check_done = false;
             state.refreshing = false;
+            state.selection.clear();
+            state.pending_delete.clear();
         }
-        self.ui().global::<Api>().set_selected_model(SharedString::new());
         self.sync_all();
         let app = self.clone();
         self.spawn(async move { app.refresh(true).await });
@@ -612,10 +615,8 @@ impl App {
         state.running.iter().any(|m| m.name == name || m.model.as_deref() == Some(name))
     }
 
-    fn sync_models(self: &Rc<Self>) {
-        let ui = self.ui();
-        let api = ui.global::<Api>();
-        let state = self.state.borrow();
+    /// Models as the table shows them: filtered, then sorted.
+    fn visible_models<'a>(state: &'a State, api: &Api) -> Vec<&'a OllamaModel> {
         let query = api.get_model_search().trim().to_lowercase();
         let filter = api.get_model_filter();
         let column = api.get_sort_column();
@@ -646,6 +647,17 @@ impl App {
             };
             if ascending { ordering } else { ordering.reverse() }
         });
+        rows
+    }
+
+    fn sync_models(self: &Rc<Self>) {
+        let ui = self.ui();
+        let api = ui.global::<Api>();
+        // Models hidden by the filter, or gone, are no longer selected.
+        let visible: Vec<String> = Self::visible_models(&self.state.borrow(), &api).iter().map(|m| m.name.clone()).collect();
+        self.state.borrow_mut().selection.retain_visible(&visible);
+        let state = self.state.borrow();
+        let rows = Self::visible_models(&state, &api);
 
         let now = chrono::Utc::now();
         let downloads = self.downloads.borrow();
@@ -672,6 +684,7 @@ impl App {
                     can_load: m.can_load(),
                     can_customize: !m.is_cloud() && m.can_chat(),
                     has_page: m.reference().and_then(|r| r.web_page()).is_some(),
+                    selected: state.selection.contains(&m.name),
                 }
             })
             .collect();
@@ -697,6 +710,8 @@ impl App {
             String::new()
         };
         api.set_models_subtitle(subtitle.into());
+        self.publish_selection(&state, &api, &visible);
+        drop(state);
         self.sync_selected_index();
     }
 
@@ -963,29 +978,76 @@ impl App {
                 }
             }
         });
-        api.on_select_model(with(|app, name| {
-            app.ui().global::<Api>().set_selected_model(name.into());
-            app.sync_detail();
-        }));
+        api.on_select_model(with(|app, name| app.change_selection(|selection, _| selection.select(&name))));
+        api.on_click_model({
+            let app = Rc::downgrade(self);
+            move |name, extend, toggle| {
+                let Some(app) = app.upgrade() else { return };
+                app.change_selection(|selection, visible| {
+                    if toggle {
+                        selection.toggle(&name);
+                    } else if extend {
+                        selection.extend_to(&name, visible);
+                    } else {
+                        selection.select(&name);
+                    }
+                });
+            }
+        });
         api.on_move_selection({
             let app = Rc::downgrade(self);
-            move |delta| {
-                let Some(app) = app.upgrade() else { return };
-                let ui = app.ui();
-                let api = ui.global::<Api>();
-                let rows = api.get_models();
-                if rows.row_count() == 0 {
-                    return;
+            move |delta, extend| {
+                if let Some(app) = app.upgrade() {
+                    app.change_selection(|selection, visible| selection.move_by(delta, extend, visible));
                 }
-                let current = api.get_selected_model();
-                let index = (0..rows.row_count()).find(|&i| rows.row_data(i).is_some_and(|r| r.name == current));
-                let next = match index {
-                    None => 0,
-                    Some(i) => (i as i64 + delta as i64).clamp(0, rows.row_count() as i64 - 1) as usize,
+            }
+        });
+        api.on_select_all_models({
+            let app = Rc::downgrade(self);
+            move || {
+                if let Some(app) = app.upgrade() {
+                    app.change_selection(|selection, visible| selection.select_all(visible));
+                }
+            }
+        });
+        api.on_update_selection({
+            let app = Rc::downgrade(self);
+            move || {
+                let Some(app) = app.upgrade() else { return };
+                for name in app.selected_names(|m| !m.is_cloud() && m.reference().is_some()) {
+                    downloads::pull(&app, &name);
+                }
+            }
+        });
+        api.on_unload_selection({
+            let app = Rc::downgrade(self);
+            move || {
+                let Some(app) = app.upgrade() else { return };
+                let running: Vec<String> = {
+                    let state = app.state.borrow();
+                    app.selected_names(|m| Self::is_running(&state, &m.name))
                 };
-                if let Some(row) = rows.row_data(next) {
-                    api.set_selected_model(row.name);
-                    app.sync_detail();
+                for name in running {
+                    app.unload(name);
+                }
+            }
+        });
+        api.on_delete_selection({
+            let app = Rc::downgrade(self);
+            move || {
+                if let Some(app) = app.upgrade() {
+                    let names = app.selected_names(|_| true);
+                    app.open_delete_dialog(names);
+                }
+            }
+        });
+        api.on_confirm_delete({
+            let app = Rc::downgrade(self);
+            move || {
+                let Some(app) = app.upgrade() else { return };
+                let names = std::mem::take(&mut app.state.borrow_mut().pending_delete);
+                if !names.is_empty() {
+                    app.delete_models(names);
                 }
             }
         });
@@ -1323,9 +1385,7 @@ impl App {
                 self.prefill_system_prompt(target.clone());
             }
             5 => {
-                let state = self.state.borrow();
-                let size = state.models.iter().find(|m| m.name == target).filter(|m| !m.is_cloud() && m.size > 0).map(|m| m.size);
-                api.set_dialog_message(self.text.delete_message(size).into());
+                self.prepare_delete_dialog(vec![target.clone()]);
             }
             _ => {}
         }
@@ -1412,39 +1472,135 @@ impl App {
     }
 
     fn delete_model(self: &Rc<Self>, name: String) {
+        self.delete_models(vec![name]);
+    }
+
+    /// Deletes models one after the other (unloading them first), then refreshes once.
+    fn delete_models(self: &Rc<Self>, names: Vec<String>) {
         let (client, running, generation) = {
             let state = self.state.borrow();
-            (state.client.clone(), Self::is_running(&state, &name), state.server_generation)
+            let running: Vec<bool> = names.iter().map(|name| Self::is_running(&state, name)).collect();
+            (state.client.clone(), running, state.server_generation)
         };
         let app = self.clone();
         self.spawn(async move {
-            let task_name = name.clone();
-            let result = app
+            let jobs: Vec<(String, bool)> = names.into_iter().zip(running).collect();
+            let results = app
                 .io(async move {
-                    if running {
-                        let _ = client.unload(&task_name).await;
+                    let mut results = Vec::new();
+                    for (name, running) in jobs {
+                        if running {
+                            let _ = client.unload(&name).await;
+                        }
+                        let result = client.delete(&name).await;
+                        results.push((name, result));
                     }
-                    client.delete(&task_name).await
+                    results
                 })
-                .await;
+                .await
+                .unwrap_or_default();
             if app.state.borrow().server_generation != generation {
                 return;
             }
-            match result {
-                Some(Ok(())) => {
-                    app.state.borrow_mut().updates.remove(&name);
-                    let ui = app.ui();
-                    let api = ui.global::<Api>();
-                    if api.get_selected_model() == name.as_str() {
-                        api.set_selected_model(SharedString::new());
+            let mut failures = Vec::new();
+            for (name, result) in results {
+                match result {
+                    Ok(()) => {
+                        app.state.borrow_mut().updates.remove(&name);
                     }
+                    Err(error) => failures.push((name, error)),
                 }
-                Some(Err(error)) => app.toast(app.text.could_not_delete(&name), app.text.api_error(&error)),
-                None => {}
+            }
+            match failures.as_slice() {
+                [] => {}
+                [(name, error)] => app.toast(app.text.could_not_delete(name), app.text.api_error(error)),
+                [(_, error), ..] => {
+                    let names: Vec<&str> = failures.iter().map(|(name, _)| name.as_str()).collect();
+                    app.toast(app.text.could_not_delete_many(failures.len()), format!("{} — {}", app.text.name_list(&names), app.text.api_error(error)));
+                }
             }
             app.refresh_models().await;
             app.refresh_running().await;
         });
+    }
+
+    /// Selected models, in the order of the table, that match `filter`.
+    fn selected_names(&self, filter: impl Fn(&OllamaModel) -> bool) -> Vec<String> {
+        let ui = self.ui();
+        let api = ui.global::<Api>();
+        let state = self.state.borrow();
+        let visible = Self::visible_models(&state, &api);
+        visible.into_iter().filter(|m| state.selection.contains(&m.name) && filter(m)).map(|m| m.name.clone()).collect()
+    }
+
+    /// Applies a change to the selection, then updates the table and the inspector.
+    fn change_selection(self: &Rc<Self>, change: impl FnOnce(&mut Selection, &[String])) {
+        let visible: Vec<String> = self.ui().global::<Api>().get_models().iter().map(|row| row.name.to_string()).collect();
+        change(&mut self.state.borrow_mut().selection, &visible);
+        self.sync_models();
+        self.sync_detail();
+    }
+
+    /// Selection state for the interface: row highlights come with the rows.
+    fn publish_selection(&self, state: &State, api: &Api, visible: &[String]) {
+        let primary: SharedString = state.selection.primary().unwrap_or_default().into();
+        if api.get_selected_model() != primary {
+            api.set_selected_model(primary);
+        }
+        let count = state.selection.len();
+        api.set_selected_count(count as i32);
+        if count < 2 {
+            return;
+        }
+        let selected: Vec<&OllamaModel> =
+            state.selection.in_order(visible).into_iter().filter_map(|name| state.models.iter().find(|m| m.name == name)).collect();
+        let size: u64 = selected.iter().filter(|m| !m.is_cloud()).map(|m| m.size).sum();
+        let running = selected.iter().filter(|m| Self::is_running(state, &m.name)).count();
+        let updatable = selected.iter().filter(|m| !m.is_cloud() && m.reference().is_some()).count();
+        api.set_selection_title(self.text.models_selected(count).into());
+        api.set_selection_summary(self.text.selection_summary(size, running).into());
+        api.set_selection_update_label(self.text.update_models(updatable).into());
+        api.set_selection_delete_label(self.text.delete_models(count).into());
+        api.set_selection_can_update(updatable > 0);
+        api.set_selection_has_running(running > 0);
+    }
+
+    /// Delete dialog for one model or several.
+    fn prepare_delete_dialog(&self, names: Vec<String>) {
+        let ui = self.ui();
+        let api = ui.global::<Api>();
+        let mut state = self.state.borrow_mut();
+        let size: u64 = names.iter().filter_map(|name| state.models.iter().find(|m| m.name == *name)).filter(|m| !m.is_cloud()).map(|m| m.size).sum();
+        let title = match names.as_slice() {
+            [name] => self.text.delete_title_one(name),
+            _ => self.text.delete_title_many(names.len()),
+        };
+        let mut message = self.text.delete_message((size > 0).then_some(size));
+        if names.len() > 1 {
+            let list: Vec<&str> = names.iter().map(String::as_str).collect();
+            message = format!("{}\n\n{message}", self.text.name_list(&list));
+        }
+        api.set_dialog_title(title.into());
+        api.set_dialog_message(message.into());
+        state.pending_delete = names;
+    }
+
+    fn open_delete_dialog(self: &Rc<Self>, names: Vec<String>) {
+        match names.as_slice() {
+            [] => {}
+            [name] => self.open_dialog(5, name.clone()),
+            _ => {
+                self.dialog_token.set(self.dialog_token.get() + 1);
+                let ui = self.ui();
+                let api = ui.global::<Api>();
+                api.set_dialog_error(SharedString::new());
+                api.set_dialog_status(SharedString::new());
+                api.set_dialog_busy(false);
+                self.prepare_delete_dialog(names);
+                api.set_dialog_target(SharedString::new());
+                api.set_dialog(5);
+            }
+        }
     }
 
     fn create_model(self: &Rc<Self>, base: String, name: String, system: String, parameters: serde_json::Value) {
@@ -1515,11 +1671,18 @@ impl App {
         let found = self.state.borrow().models.iter().find(|m| canonical(&m.name) == target).map(|m| m.name.clone());
         let ui = self.ui();
         let api = ui.global::<Api>();
-        if let Some(found) = found {
-            api.set_selected_model(found.into());
-        }
         api.set_section(0);
-        self.sync_detail();
+        // Hidden by the search or the filter: show everything, so it can be selected.
+        if let Some(found) = &found
+            && !Self::visible_models(&self.state.borrow(), &api).iter().any(|m| m.name == *found)
+        {
+            api.set_model_search(SharedString::new());
+            api.set_model_filter(0);
+        }
+        match found {
+            Some(found) => self.change_selection(|selection, _| selection.select(&found)),
+            None => self.sync_detail(),
+        }
     }
 
     fn toast(self: &Rc<Self>, title: String, message: String) {
@@ -1553,6 +1716,15 @@ impl App {
         api.set_check_updates_at_launch(settings.check_updates_on_launch);
         api.set_theme_index(settings.theme);
         api.set_show_tray_icon(settings.show_tray_icon);
+        let layout = &settings.layout;
+        api.set_sidebar_width(layout.sidebar);
+        api.set_inspector_width(layout.inspector);
+        api.set_library_width(layout.library);
+        api.set_column_parameters(layout.columns[0]);
+        api.set_column_quantization(layout.columns[1]);
+        api.set_column_size(layout.columns[2]);
+        api.set_column_capabilities(layout.columns[3]);
+        api.set_column_modified(layout.columns[4]);
         drop(state);
         self.apply_theme();
     }
@@ -1626,6 +1798,29 @@ impl App {
                 app.sync_detail();
                 chat::sync_hint(&app);
                 tray::set_visible(&app, api.get_show_tray_icon());
+            }
+        });
+        api.on_layout_changed({
+            let app = Rc::downgrade(self);
+            move || {
+                let Some(app) = app.upgrade() else { return };
+                let ui = app.ui();
+                let api = ui.global::<Api>();
+                let mut state = app.state.borrow_mut();
+                state.settings.layout = crate::settings::Layout {
+                    sidebar: api.get_sidebar_width(),
+                    inspector: api.get_inspector_width(),
+                    library: api.get_library_width(),
+                    columns: [
+                        api.get_column_parameters(),
+                        api.get_column_quantization(),
+                        api.get_column_size(),
+                        api.get_column_capabilities(),
+                        api.get_column_modified(),
+                    ],
+                };
+                state.settings.normalize();
+                state.settings.save();
             }
         });
         api.on_add_server({

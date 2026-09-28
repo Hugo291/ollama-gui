@@ -1,6 +1,6 @@
 [package]
 name = "ollama-gui"
-version = "2.1.0"
+version = "2.2.0"
 edition = "2024"
 description = "Manage your Ollama models: pull, update, load, customize and chat."
 license = "MIT"

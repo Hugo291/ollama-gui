@@ -17,6 +17,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 use slint::winit_030::winit::platform::macos::WindowAttributesExtMacOS;
                 attributes.with_titlebar_transparent(true).with_fullsize_content_view(true).with_title_hidden(true)
             };
+            // Scripted runs (debug builds): off screen and without the focus, so they neither
+            // disturb nor get disturbed by someone using the computer. Snapshots still work.
+            #[cfg(debug_assertions)]
+            let attributes = if std::env::var_os("OLLAMA_GUI_SCRIPT").is_some() { attributes.with_active(false) } else { attributes };
             attributes
         })
         .select()?;

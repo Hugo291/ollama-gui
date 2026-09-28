@@ -4,7 +4,7 @@ import { Icons } from "icons.slint";
 import { Api, ModelRow } from "api.slint";
 import {
     Icon, Label, ModelIcon, Badge, CapabilityBadge, CapabilityIcons, StatusDot, ToolButton, SearchField,
-    EmptyState, CodeDisclosure, Divider, VDivider, Toolbar, MenuButton, MenuEntry
+    EmptyState, CodeDisclosure, Divider, VDivider, Toolbar, MenuButton, MenuEntry, Splitter, DangerButton
 } from "components.slint";
 
 export global ModelFilters {
@@ -85,73 +85,95 @@ component ModelTableRow inherits Rectangle {
     in property <ModelRow> data;
     in property <int> index;
     in property <bool> compact;
-    property <bool> selected: Api.selected-model == data.name;
-    callback clicked();
+    property <bool> selected: data.selected;
+    // Among several selected models: the menu acts on all of them.
+    property <bool> multi: data.selected && Api.selected-count > 1;
+    // Shift extends the selection, ⌘ (Ctrl on Windows) adds or removes this model.
+    callback clicked(extend: bool, toggle: bool);
     accessible-role: list-item;
     accessible-label: root.data.name;
     accessible-description: root.data.parameters + " " + root.data.size;
     accessible-item-selectable: true;
     accessible-item-selected: root.selected;
     accessible-item-index: root.index;
-    accessible-action-default => { root.clicked(); }
+    accessible-action-default => { root.clicked(false, false); }
     height: 32px;
     background: selected ? Theme.selection : touch.has-hover ? Theme.hover : Math.mod(index, 2) == 1 ? Theme.zebra : transparent;
     ContextMenuArea {
         Menu {
-            MenuItem {
+            if !root.multi: MenuItem {
                 title: @tr("Chat");
                 enabled: root.data.can-chat;
                 activated => { Api.chat-with(root.data.name); }
             }
-            if root.data.running: MenuItem {
+            if !root.multi && root.data.running: MenuItem {
                 title: @tr("Unload from Memory");
                 activated => { Api.unload-model(root.data.name); }
             }
-            if !root.data.running: MenuItem {
+            if !root.multi && !root.data.running: MenuItem {
                 title: @tr("Load into Memory");
                 enabled: root.data.can-load;
                 activated => { Api.load-model(root.data.name); }
             }
-            MenuSeparator { }
-            MenuItem {
+            if !root.multi: MenuSeparator { }
+            if !root.multi: MenuItem {
                 title: @tr("Update");
                 activated => { Api.update-model(root.data.name); }
             }
-            MenuItem {
+            if !root.multi: MenuItem {
                 title: @tr("Duplicate…");
                 activated => { Api.open-dialog(2, root.data.name); }
             }
-            MenuItem {
+            if !root.multi: MenuItem {
                 title: @tr("Rename…");
                 activated => { Api.open-dialog(3, root.data.name); }
             }
-            MenuItem {
+            if !root.multi: MenuItem {
                 title: @tr("Customize…");
                 enabled: root.data.can-customize;
                 activated => { Api.open-dialog(4, root.data.name); }
             }
-            MenuSeparator { }
-            MenuItem {
+            if !root.multi: MenuSeparator { }
+            if !root.multi: MenuItem {
                 title: @tr("Copy Name");
                 activated => { Api.copy-name(root.data.name); }
             }
-            MenuItem {
+            if !root.multi: MenuItem {
                 title: @tr("Open Model Page");
                 enabled: root.data.has-page;
                 activated => { Api.open-page(root.data.name); }
             }
-            MenuSeparator { }
-            MenuItem {
+            if !root.multi: MenuSeparator { }
+            if !root.multi: MenuItem {
                 title: @tr("Delete…");
                 activated => { Api.open-dialog(5, root.data.name); }
             }
+            // Several models: the actions of version 1 for a selection.
+            if root.multi: MenuItem {
+                title: Api.selection-update-label;
+                enabled: Api.selection-can-update;
+                activated => { Api.update-selection(); }
+            }
+            if root.multi && Api.selection-has-running: MenuItem {
+                title: @tr("Unload from Memory");
+                activated => { Api.unload-selection(); }
+            }
+            if root.multi: MenuSeparator { }
+            if root.multi: MenuItem {
+                title: Api.selection-delete-label;
+                activated => { Api.delete-selection(); }
+            }
         }
         touch := TouchArea {
-            clicked => { root.clicked(); }
             pointer-event(event) => {
-                // Select on right-click too, before the context menu opens.
-                if event.button == PointerEventButton.right && event.kind == PointerEventKind.down {
-                    root.clicked();
+                if event.kind != PointerEventKind.down {
+                    return;
+                }
+                if event.button == PointerEventButton.left {
+                    root.clicked(event.modifiers.shift, event.modifiers.control);
+                } else if event.button == PointerEventButton.right && !root.data.selected {
+                    // Right-click outside the selection selects that model, before its menu opens.
+                    root.clicked(false, false);
                 }
             }
         }
@@ -160,7 +182,7 @@ component ModelTableRow inherits Rectangle {
         padding-left: 12px;
         Rectangle {
             horizontal-stretch: 1;
-            min-width: 160px;
+            min-width: 128px;
             HorizontalLayout {
                 spacing: 8px;
                 ModelIcon {
@@ -207,18 +229,19 @@ component ModelTableRow inherits Rectangle {
                 Rectangle { horizontal-stretch: 0.001; }
             }
         }
-        Cell { width: 92px; text: root.data.parameters; }
-        if !root.compact: Cell { width: 112px; text: root.data.quantization; }
-        Cell { width: 90px; text: root.data.size; secondary: root.data.is-cloud; }
+        Cell { width: Api.column-parameters; text: root.data.parameters; }
+        if !root.compact: Cell { width: Api.column-quantization; text: root.data.quantization; }
+        Cell { width: Api.column-size; text: root.data.size; secondary: root.data.is-cloud; }
         Rectangle {
-            width: 118px;
+            width: Api.column-capabilities;
+            clip: true;
             CapabilityIcons {
                 x: 8px;
                 capabilities: root.data.capabilities;
             }
         }
         if !root.compact: Cell {
-            width: 112px;
+            width: Api.column-modified;
             text: root.data.modified;
             secondary: true;
             Tooltip { text: @markdown("\{root.data.modified-long}"); }
@@ -227,8 +250,15 @@ component ModelTableRow inherits Rectangle {
 }
 
 component ModelTable inherits Rectangle {
-    // The full table needs about 700 px; below, Quantization and Modified are hidden.
-    property <bool> compact: self.width < 700px;
+    // Rows are 4 px narrower than the table: the Cupertino list keeps 2 px on each side.
+    property <length> row-width: self.width - 4px;
+    // Without room for every column (Name keeps 140 px with its icon), Quantization and Modified are hidden.
+    property <bool> compact: root.row-width < 140px + Api.column-parameters + Api.column-quantization + Api.column-size + Api.column-capabilities + Api.column-modified;
+    // What Name has beyond its minimum: a column grows by this much at most, so a drag
+    // neither squeezes Name nor switches the table to compact under the pointer. Negative
+    // in a very narrow window: the columns can then only shrink.
+    property <length> room: root.row-width - 140px - Api.column-parameters - Api.column-size - Api.column-capabilities
+        - (root.compact ? 0px : Api.column-quantization + Api.column-modified);
     border-radius: Theme.radius;
     border-width: 1px;
     border-color: Theme.card-stroke;
@@ -239,13 +269,21 @@ component ModelTable inherits Rectangle {
         key-pressed(event) => {
             // Delete, or ⌘⌫ on macOS (Slint reports ⌘ as `control`) and Ctrl+Backspace on Windows.
             if event.text == Key.Delete || (event.text == Key.Backspace && event.modifiers.control) {
+                if Api.selected-count > 1 {
+                    Api.delete-selection();
+                    return accept;
+                }
                 if Api.selected-model != "" {
                     Api.open-dialog(5, Api.selected-model);
                     return accept;
                 }
             }
             if event.text == Key.UpArrow || event.text == Key.DownArrow {
-                Api.move-selection(event.text == Key.UpArrow ? -1 : 1);
+                Api.move-selection(event.text == Key.UpArrow ? -1 : 1, event.modifiers.shift);
+                return accept;
+            }
+            if (event.text == "a" || event.text == "A") && event.modifiers.control {
+                Api.select-all-models();
                 return accept;
             }
             reject
@@ -255,12 +293,70 @@ component ModelTable inherits Rectangle {
                 height: 30px;
                 HorizontalLayout {
                     padding-left: 40px;
-                    HeaderCell { title: @tr("Name"); column: 0; horizontal-stretch: 1; min-width: 132px; }
-                    HeaderCell { title: @tr("Parameters"); column: 1; width: 92px; }
-                    if !root.compact: HeaderCell { title: @tr("Quantization"); column: 2; width: 112px; }
-                    HeaderCell { title: @tr("Size"); column: 3; width: 90px; }
-                    HeaderCell { title: @tr("Capabilities"); width: 118px; }
-                    if !root.compact: HeaderCell { title: @tr("Modified"); column: 4; width: 112px; }
+                    HeaderCell { title: @tr("Name"); column: 0; horizontal-stretch: 1; min-width: 100px; }
+                    HeaderCell { title: @tr("Parameters"); column: 1; width: Api.column-parameters; }
+                    if !root.compact: HeaderCell { title: @tr("Quantization"); column: 2; width: Api.column-quantization; }
+                    HeaderCell { title: @tr("Size"); column: 3; width: Api.column-size; }
+                    HeaderCell { title: @tr("Capabilities"); width: Api.column-capabilities; }
+                    if !root.compact: HeaderCell { title: @tr("Modified"); column: 4; width: Api.column-modified; }
+                }
+                // Column edges: dragging the left edge of a column resizes it, Name takes the rest.
+                property <length> modified-width: root.compact ? 0px : Api.column-modified;
+                property <length> quantization-width: root.compact ? 0px : Api.column-quantization;
+                if !root.compact: Splitter {
+                    x: parent.width - Api.column-modified - 3px;
+                    height: parent.height;
+                    show-line: true;
+                    reversed: true;
+                    size <=> Api.column-modified;
+                    minimum: 70px;
+                    maximum: min(220px, Api.column-modified + max(root.room, 0px));
+                    default-size: 112px;
+                    resized => { Api.layout-changed(); }
+                }
+                Splitter {
+                    x: parent.width - parent.modified-width - Api.column-capabilities - 3px;
+                    height: parent.height;
+                    show-line: true;
+                    reversed: true;
+                    size <=> Api.column-capabilities;
+                    minimum: 60px;
+                    maximum: min(240px, Api.column-capabilities + max(root.room, 0px));
+                    default-size: 118px;
+                    resized => { Api.layout-changed(); }
+                }
+                Splitter {
+                    x: parent.width - parent.modified-width - Api.column-capabilities - Api.column-size - 3px;
+                    height: parent.height;
+                    show-line: true;
+                    reversed: true;
+                    size <=> Api.column-size;
+                    minimum: 60px;
+                    maximum: min(180px, Api.column-size + max(root.room, 0px));
+                    default-size: 90px;
+                    resized => { Api.layout-changed(); }
+                }
+                if !root.compact: Splitter {
+                    x: parent.width - Api.column-modified - Api.column-capabilities - Api.column-size - Api.column-quantization - 3px;
+                    height: parent.height;
+                    show-line: true;
+                    reversed: true;
+                    size <=> Api.column-quantization;
+                    minimum: 70px;
+                    maximum: min(200px, Api.column-quantization + max(root.room, 0px));
+                    default-size: 112px;
+                    resized => { Api.layout-changed(); }
+                }
+                Splitter {
+                    x: parent.width - parent.modified-width - Api.column-capabilities - Api.column-size - parent.quantization-width - Api.column-parameters - 3px;
+                    height: parent.height;
+                    show-line: true;
+                    reversed: true;
+                    size <=> Api.column-parameters;
+                    minimum: 60px;
+                    maximum: min(200px, Api.column-parameters + max(root.room, 0px));
+                    default-size: 92px;
+                    resized => { Api.layout-changed(); }
                 }
             }
             Divider { }
@@ -281,10 +377,47 @@ component ModelTable inherits Rectangle {
                     data: row;
                     index: index;
                     compact: root.compact;
-                    clicked => {
+                    clicked(extend, toggle) => {
                         keys.focus();
-                        Api.select-model(row.name);
+                        Api.click-model(row.name, extend, toggle);
                     }
+                }
+            }
+        }
+    }
+}
+
+// Inspector when several models are selected, like version 1: count, size, actions.
+component SelectionPane inherits Rectangle {
+    background: Theme.window;
+    EmptyState {
+        icon: Icons.models;
+        title: Api.selection-title;
+        message: Api.selection-summary;
+        VerticalLayout {
+            spacing: 8px;
+            padding-top: 4px;
+            if Api.selection-can-update || Api.selection-has-running: HorizontalLayout {
+                alignment: center;
+                spacing: 8px;
+                if Api.selection-can-update: Button {
+                    text: Api.selection-update-label;
+                    icon: Icons.downloads;
+                    colorize-icon: true;
+                    clicked => { Api.update-selection(); }
+                }
+                if Api.selection-has-running: Button {
+                    text: @tr("Unload");
+                    icon: Icons.stop;
+                    colorize-icon: true;
+                    clicked => { Api.unload-selection(); }
+                }
+            }
+            HorizontalLayout {
+                alignment: center;
+                DangerButton {
+                    text: Api.selection-delete-label;
+                    clicked => { Api.delete-selection(); }
                 }
             }
         }
@@ -530,8 +663,13 @@ export component ModelsPage inherits VerticalLayout {
         }
     }
     Divider { }
-    HorizontalLayout {
+    // Hidden in a narrow window, where the table would be too narrow to read; narrower than
+    // its saved width when the table would get less than 520 px.
+    property <bool> inspector-visible: root.show-inspector && root.width >= 880px;
+    property <length> inspector-width: min(Api.inspector-width, root.width - 520px);
+    Rectangle {
         vertical-stretch: 1;
+    HorizontalLayout {
         Rectangle {
             horizontal-stretch: 1;
             if Api.connection == 1 && !Api.models-loaded: Spinner {
@@ -575,16 +713,27 @@ export component ModelsPage inherits VerticalLayout {
                 height: parent.height - 24px;
             }
         }
-        // Hidden in a narrow window, where the table would be too narrow to read.
-        if root.show-inspector && root.width >= 880px: VDivider { }
-        if root.show-inspector && root.width >= 880px: Rectangle {
-            width: 360px;
-            if Api.has-detail: DetailsPane { }
-            if !Api.has-detail: EmptyState {
+        if root.inspector-visible: VDivider { }
+        if root.inspector-visible: Rectangle {
+            width: root.inspector-width;
+            if Api.selected-count > 1: SelectionPane { }
+            if Api.selected-count <= 1 && Api.has-detail: DetailsPane { }
+            if Api.selected-count <= 1 && !Api.has-detail: EmptyState {
                 icon: Icons.info;
                 title: @tr("No Selection");
                 message: @tr("Select a model to see its details.");
             }
         }
+    }
+    if root.inspector-visible: Splitter {
+        x: parent.width - root.inspector-width - 4px;
+        height: parent.height;
+        reversed: true;
+        size <=> Api.inspector-width;
+        minimum: 300px;
+        maximum: min(560px, root.width - 520px);
+        default-size: 360px;
+        resized => { Api.layout-changed(); }
+    }
     }
 }

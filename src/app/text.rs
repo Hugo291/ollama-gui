@@ -268,6 +268,12 @@ impl Text {
             Lang::Fr => format!("Impossible de créer {name}"),
         }
     }
+    pub fn could_not_delete_many(&self, count: usize) -> String {
+        match self.lang {
+            Lang::En => format!("Couldn't delete {count} models"),
+            Lang::Fr => format!("Impossible de supprimer {count} modèles"),
+        }
+    }
     pub fn could_not_load(&self, name: &str) -> String {
         match self.lang {
             Lang::En => format!("Couldn't load {name}"),
@@ -285,6 +291,62 @@ impl Text {
     }
     pub fn incomplete(&self) -> String {
         self.pick("The operation ended before it completed.", "L’opération s’est arrêtée avant la fin.")
+    }
+
+    // Selection of several models
+
+    pub fn models_selected(&self, count: usize) -> String {
+        match self.lang {
+            Lang::En => format!("{count} models selected"),
+            Lang::Fr => format!("{count} modèles sélectionnés"),
+        }
+    }
+
+    pub fn selection_summary(&self, bytes: u64, running: usize) -> String {
+        let size = self.bytes(bytes);
+        if running == 0 { size } else { format!("{size} · {}", self.loaded_count(running)) }
+    }
+
+    pub fn update_models(&self, count: usize) -> String {
+        match (self.lang, count) {
+            (Lang::En, 1) => "Update 1 Model".into(),
+            (Lang::En, n) => format!("Update {n} Models"),
+            (Lang::Fr, 0 | 1) => format!("Mettre à jour {count} modèle"),
+            (Lang::Fr, n) => format!("Mettre à jour {n} modèles"),
+        }
+    }
+
+    pub fn delete_models(&self, count: usize) -> String {
+        match self.lang {
+            Lang::En => format!("Delete {count} Models…"),
+            Lang::Fr => format!("Supprimer {count} modèles…"),
+        }
+    }
+
+    pub fn delete_title_one(&self, name: &str) -> String {
+        match self.lang {
+            Lang::En => format!("Delete “{name}”?"),
+            Lang::Fr => format!("Supprimer « {name} » ?"),
+        }
+    }
+
+    pub fn delete_title_many(&self, count: usize) -> String {
+        match self.lang {
+            Lang::En => format!("Delete {count} models?"),
+            Lang::Fr => format!("Supprimer {count} modèles ?"),
+        }
+    }
+
+    /// `a, b, c and 2 more`.
+    pub fn name_list(&self, names: &[&str]) -> String {
+        const SHOWN: usize = 5;
+        let list = names.iter().take(SHOWN).copied().collect::<Vec<_>>().join(", ");
+        match (self.lang, names.len().saturating_sub(SHOWN)) {
+            (_, 0) => list,
+            (Lang::En, more) => format!("{list} and {more} more"),
+            (Lang::Fr, 1) => format!("{list} et 1 autre"),
+            (Lang::Fr, more) => format!("{list} et {more} autres"),
+        }
     }
 
     pub fn delete_message(&self, size: Option<u64>) -> String {

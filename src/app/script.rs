@@ -16,6 +16,15 @@ pub fn run(app: &Rc<App>) {
     let steps: Vec<String> = script.split(';').map(str::to_owned).collect();
     let app = app.clone();
     let _ = slint::spawn_local(async move {
+        // Off screen: a scripted run must not cover the screen of someone using the computer,
+        // nor receive their clicks. Snapshots are rendered by the app, they still work.
+        {
+            use slint::winit_030::WinitWindowAccessor;
+            let ui = app.ui();
+            ui.window().with_winit_window(|window| {
+                window.set_outer_position(slint::winit_030::winit::dpi::PhysicalPosition::new(-20000, 400));
+            });
+        }
         for step in steps {
             let (command, argument) = step.split_once(':').unwrap_or((step.as_str(), ""));
             let pause = if command == "wait" { argument.parse().unwrap_or(1.0) } else { 1.5 };
@@ -65,7 +74,20 @@ pub fn run(app: &Rc<App>) {
                     api.set_model_search(argument.into());
                     api.invoke_models_query_changed();
                 }
-                "move" => api.invoke_move_selection(argument.parse().unwrap_or(1)),
+                "move" => api.invoke_move_selection(argument.parse().unwrap_or(1), false),
+                // Selection: `click:name`, `click:name:shift`, `click:name:toggle`, `select-all`.
+                "click" => {
+                    let (name, modifier) = match argument.rsplit_once(':') {
+                        Some((name, modifier @ ("shift" | "toggle"))) => (name, modifier),
+                        _ => (argument, ""),
+                    };
+                    api.invoke_click_model(name.into(), modifier == "shift", modifier == "toggle");
+                }
+                "select-all" => api.invoke_select_all_models(),
+                "delete-selection" => api.invoke_delete_selection(),
+                "sidebar" => api.set_sidebar_width(argument.parse().unwrap_or(232.0)),
+                "inspector" => api.set_inspector_width(argument.parse().unwrap_or(360.0)),
+                "layout-changed" => api.invoke_layout_changed(),
                 "check-updates" => api.invoke_check_updates(),
                 "add-server" => api.invoke_add_server(),
                 // Servers by position in the list: `server:1`, `remove-server:1`, `save-server:1>name>address`.
@@ -102,10 +124,11 @@ pub fn run(app: &Rc<App>) {
                 "print" => {
                     use slint::Model;
                     eprintln!(
-                        "state: section={} dialog={} selected={} index={} models={} library={} more={} chat-model={} messages={} draft={:?} theme-dark={} servers={}",
+                        "state: section={} dialog={} selected={} count={} index={} models={} library={} more={} chat-model={} messages={} draft={:?} theme-dark={} servers={} sidebar={} inspector={} dialog-title={:?}",
                         api.get_section(),
                         api.get_dialog(),
                         api.get_selected_model(),
+                        api.get_selected_count(),
                         api.get_selected_index(),
                         api.get_models().row_count(),
                         api.get_library_results().row_count(),
@@ -115,10 +138,52 @@ pub fn run(app: &Rc<App>) {
                         api.get_chat_draft(),
                         ui.global::<crate::Theme>().get_dark(),
                         api.get_server_list().row_count(),
+                        api.get_sidebar_width(),
+                        api.get_inspector_width(),
+                        api.get_dialog_title(),
                     );
                 }
                 // Keyboard: `key:return`, `key:escape`, `key:up`, `key:a`; `ctrl:1` holds ⌘ (Ctrl on Windows).
-                "key" | "ctrl" => {
+                // Mouse: `drag:x1,y1,x2,y2` (dividers), `dblclick:x,y`, `rclick:x,y`, in logical pixels.
+                "rclick" => {
+                    use slint::platform::{PointerEventButton, WindowEvent};
+                    let numbers: Vec<f32> = argument.split(',').filter_map(|n| n.trim().parse().ok()).collect();
+                    let position = slint::LogicalPosition::new(numbers.first().copied().unwrap_or(0.0), numbers.get(1).copied().unwrap_or(0.0));
+                    let window = ui.window();
+                    let _ = window.dispatch_event_with_result(WindowEvent::PointerMoved { position });
+                    let _ = window.dispatch_event_with_result(WindowEvent::PointerPressed { position, button: PointerEventButton::Right });
+                    let _ = window.dispatch_event_with_result(WindowEvent::PointerReleased { position, button: PointerEventButton::Right });
+                }
+                "drag" | "dblclick" => {
+                    use slint::platform::{PointerEventButton, WindowEvent};
+                    let numbers: Vec<f32> = argument.split(',').filter_map(|n| n.trim().parse().ok()).collect();
+                    let window = ui.window();
+                    let point = |i: usize| slint::LogicalPosition::new(numbers.get(i).copied().unwrap_or(0.0), numbers.get(i + 1).copied().unwrap_or(0.0));
+                    let press = |position| {
+                        let _ = window.dispatch_event_with_result(WindowEvent::PointerMoved { position });
+                        let _ = window.dispatch_event_with_result(WindowEvent::PointerPressed { position, button: PointerEventButton::Left });
+                    };
+                    let release = |position| {
+                        let _ = window.dispatch_event_with_result(WindowEvent::PointerReleased { position, button: PointerEventButton::Left });
+                    };
+                    if command == "drag" {
+                        let (start, end) = (point(0), point(2));
+                        press(start);
+                        for step in 1..=10 {
+                            let t = step as f32 / 10.0;
+                            let position = slint::LogicalPosition::new(start.x + (end.x - start.x) * t, start.y + (end.y - start.y) * t);
+                            let _ = window.dispatch_event_with_result(WindowEvent::PointerMoved { position });
+                        }
+                        release(end);
+                    } else {
+                        let position = point(0);
+                        press(position);
+                        release(position);
+                        press(position);
+                        release(position);
+                    }
+                }
+                "key" | "ctrl" | "shift" => {
                     use slint::platform::{Key, WindowEvent};
                     let text: slint::SharedString = match argument {
                         "return" => Key::Return.into(),
@@ -133,6 +198,7 @@ pub fn run(app: &Rc<App>) {
                     let window = ui.window();
                     let modifier: Option<slint::SharedString> = match command {
                         "ctrl" => Some(Key::Control.into()),
+                        "shift" => Some(Key::Shift.into()),
                         _ if argument == "shift-return" => Some(Key::Shift.into()),
                         _ => None,
                     };

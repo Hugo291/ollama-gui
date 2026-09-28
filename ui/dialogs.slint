@@ -2,7 +2,7 @@ import { Button, ComboBox, LineEdit, ScrollView, Switch, Slider, Spinner, TextEd
 import { Theme } from "theme.slint";
 import { Icons } from "icons.slint";
 import { Api } from "api.slint";
-import { Icon, Label } from "components.slint";
+import { Icon, Label, DangerButton } from "components.slint";
 
 // In-window modal sheet with a dimmed backdrop.
 component Sheet inherits Rectangle {
@@ -65,30 +65,6 @@ component Sheet inherits Rectangle {
         }
     }
     init => { keys.focus(); }
-}
-
-// Main button of a destructive action (Delete), red like on macOS and Windows.
-component DangerButton inherits Rectangle {
-    in property <string> text;
-    callback clicked();
-    min-width: label.preferred-width + 28px;
-    min-height: 24px;
-    border-radius: Theme.control-radius;
-    background: touch.pressed ? Theme.red.darker(0.25) : Theme.red;
-    accessible-role: button;
-    accessible-label: root.text;
-    accessible-action-default => { root.clicked(); }
-    label := Text {
-        text: root.text;
-        color: #ffffff;
-        font-size: Theme.font-size;
-        font-weight: 600;
-        horizontal-alignment: center;
-        vertical-alignment: center;
-    }
-    touch := TouchArea {
-        clicked => { root.clicked(); }
-    }
 }
 
 component Paragraph inherits Text {
@@ -344,7 +320,8 @@ component CustomizeSheet inherits Sheet {
 }
 
 component DeleteSheet inherits Sheet {
-    title: @tr("Delete “{}”?", Api.dialog-target);
+    // One model, or the selection: composed in Rust.
+    title: Api.dialog-title;
     Paragraph { text: Api.dialog-message; }
     HorizontalLayout {
         spacing: 8px;
@@ -361,7 +338,7 @@ component DeleteSheet inherits Sheet {
     default-action => { root.confirm(); }
 
     function confirm() {
-        Api.delete-model(Api.dialog-target);
+        Api.confirm-delete();
         Api.dialog = 0;
     }
 }

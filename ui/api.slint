@@ -21,6 +21,8 @@ export struct ModelRow {
     can-load: bool,
     can-customize: bool,
     has-page: bool,
+    // Part of the selection (one or several models).
+    selected: bool,
 }
 
 export struct Fact {
@@ -180,7 +182,21 @@ export global Api {
     in-out property <bool> sort-ascending: true;
     callback models-query-changed();
     callback select-model(name: string);
-    callback move-selection(delta: int);
+    // Arrow keys; `extend` with Shift.
+    callback move-selection(delta: int, extend: bool);
+    // Several models can be selected: click, ⌘-click (Ctrl-click on Windows), Shift-click.
+    in property <int> selected-count;
+    in property <string> selection-title;
+    in property <string> selection-summary;
+    in property <string> selection-update-label;
+    in property <string> selection-delete-label;
+    in property <bool> selection-can-update;
+    in property <bool> selection-has-running;
+    callback click-model(name: string, extend: bool, toggle: bool);
+    callback select-all-models();
+    callback update-selection();
+    callback unload-selection();
+    callback delete-selection();
     callback refresh();
     callback check-updates();
     callback update-all();
@@ -201,6 +217,9 @@ export global Api {
     in property <string> dialog-status;
     in property <string> dialog-message;
     in property <string> dialog-suggestion;
+    // Title of the Delete dialog (one model or several), and its confirmation.
+    in property <string> dialog-title;
+    callback confirm-delete();
     // 0 empty, 1 invalid, 2 new, 3 already installed, 4 same as the source
     pure callback name-status(name: string, source: string) -> int;
     callback open-dialog(kind: int, target: string);
@@ -319,4 +338,15 @@ export global Api {
     in-out property <bool> show-tray-icon: true;
     callback settings-changed();
     in property <string> app-version;
+
+    // Widths of the resizable panes and table columns, saved in the settings on release.
+    in-out property <length> sidebar-width: 232px;
+    in-out property <length> inspector-width: 360px;
+    in-out property <length> library-width: 380px;
+    in-out property <length> column-parameters: 92px;
+    in-out property <length> column-quantization: 112px;
+    in-out property <length> column-size: 90px;
+    in-out property <length> column-capabilities: 118px;
+    in-out property <length> column-modified: 112px;
+    callback layout-changed();
 }

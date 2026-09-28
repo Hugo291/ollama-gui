@@ -44,6 +44,43 @@ pub struct Settings {
     /// 0 system, 1 light, 2 dark
     pub theme: i32,
     pub show_tray_icon: bool,
+    pub layout: Layout,
+}
+
+/// Widths of the resizable panes and table columns, in logical pixels.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Layout {
+    pub sidebar: f32,
+    pub inspector: f32,
+    pub library: f32,
+    /// Parameters, Quantization, Size, Capabilities and Modified columns of the Models table.
+    pub columns: [f32; 5],
+}
+
+impl Layout {
+    /// Allowed widths (the interface enforces the same bounds while dragging).
+    pub const SIDEBAR: (f32, f32) = (190.0, 320.0);
+    pub const INSPECTOR: (f32, f32) = (300.0, 560.0);
+    pub const LIBRARY: (f32, f32) = (260.0, 560.0);
+    pub const COLUMNS: [(f32, f32); 5] = [(60.0, 200.0), (70.0, 200.0), (60.0, 180.0), (60.0, 240.0), (70.0, 220.0)];
+
+    fn normalize(&mut self) {
+        let clamp = |value: f32, (min, max): (f32, f32), default: f32| if value.is_finite() { value.clamp(min, max) } else { default };
+        let defaults = Layout::default();
+        self.sidebar = clamp(self.sidebar, Self::SIDEBAR, defaults.sidebar);
+        self.inspector = clamp(self.inspector, Self::INSPECTOR, defaults.inspector);
+        self.library = clamp(self.library, Self::LIBRARY, defaults.library);
+        for (index, width) in self.columns.iter_mut().enumerate() {
+            *width = clamp(*width, Self::COLUMNS[index], defaults.columns[index]);
+        }
+    }
+}
+
+impl Default for Layout {
+    fn default() -> Self {
+        Self { sidebar: 232.0, inspector: 360.0, library: 380.0, columns: [92.0, 112.0, 90.0, 118.0, 112.0] }
+    }
 }
 
 impl Default for Settings {
@@ -57,6 +94,7 @@ impl Default for Settings {
             check_updates_on_launch: false,
             theme: 0,
             show_tray_icon: true,
+            layout: Layout::default(),
         }
     }
 }
@@ -148,6 +186,9 @@ impl Settings {
         if let Some(value) = map.get("show_tray_icon").and_then(Value::as_bool) {
             settings.show_tray_icon = value;
         }
+        if let Some(layout) = map.get("layout").and_then(|l| serde_json::from_value(l.clone()).ok()) {
+            settings.layout = layout;
+        }
         settings
     }
 
@@ -167,6 +208,7 @@ impl Settings {
             self.refresh_seconds = 3;
         }
         self.theme = self.theme.clamp(0, 2);
+        self.layout.normalize();
     }
 
     pub fn save(&self) {
