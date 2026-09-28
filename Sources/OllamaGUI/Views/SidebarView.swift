@@ -93,6 +93,6 @@ struct ServerStatusView: View {
 
     private var helpText: String {
         if case .unreachable(let message) = app.connection { return message }
-        return app.settings.currentServer.url.absoluteString
+        return app.settings.currentServer.displayURL
     }
 }

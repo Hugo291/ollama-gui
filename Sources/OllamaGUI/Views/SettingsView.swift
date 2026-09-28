@@ -55,13 +55,6 @@ private struct GeneralSettingsView: View {
 private struct ServersSettingsView: View {
     private var app: AppModel { .shared }
     @State private var selection: ServerConfig.ID?
-    @State private var testResult: TestResult?
-
-    private enum TestResult: Equatable {
-        case testing
-        case success(String)
-        case failure(String)
-    }
 
     var body: some View {
         @Bindable var settings = app.settings
@@ -73,7 +66,7 @@ private struct ServersSettingsView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(verbatim: server.name)
-                                Text(verbatim: server.url.absoluteString)
+                                Text(verbatim: server.displayURL)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -91,7 +84,7 @@ private struct ServersSettingsView: View {
 
                 HStack(spacing: 0) {
                     Button {
-                        let server = ServerConfig(name: String(localized: "New Server"), address: "http://192.168.1.10:11434")
+                        let server = ServerConfig(name: String(localized: "New Server"), address: "http://192.168.1.20:11434")
                         settings.servers.append(server)
                         selection = server.id
                     } label: {
@@ -120,8 +113,9 @@ private struct ServersSettingsView: View {
             }
             .frame(width: 230)
 
-            if let index = settings.servers.firstIndex(where: { $0.id == selection }) {
-                editor(for: $settings.servers[index])
+            if let server = settings.servers.first(where: { $0.id == selection }) {
+                ServerEditor(server: server)
+                    .id(server.id)
             } else {
                 Text("Select a server to edit it.")
                     .foregroundStyle(.secondary)
@@ -130,20 +124,47 @@ private struct ServersSettingsView: View {
         }
         .padding(20)
         .onAppear { selection = selection ?? settings.selectedServerID }
-        .onChange(of: selection) { _, _ in testResult = nil }
+    }
+}
+
+/// Edits a copy of a server: nothing changes until Save, so the app never talks to a
+/// half-typed address.
+private struct ServerEditor: View {
+    private var app: AppModel { .shared }
+    let server: ServerConfig
+
+    @State private var name: String
+    @State private var address: String
+    @State private var testResult: TestResult?
+
+    private enum TestResult: Equatable {
+        case testing
+        case success(String)
+        case failure(String)
     }
 
-    private func editor(for server: Binding<ServerConfig>) -> some View {
-        let isCurrent = server.wrappedValue.id == app.settings.selectedServerID
-        return Form {
-            TextField("Name", text: server.name)
-            TextField("Address", text: server.address, prompt: Text(verbatim: "http://127.0.0.1:11434"))
-                .onSubmit {
-                    if isCurrent { app.serverDidChange() }
-                }
-            if server.wrappedValue.isValid {
+    init(server: ServerConfig) {
+        self.server = server
+        _name = State(initialValue: server.name)
+        _address = State(initialValue: server.address)
+    }
+
+    private var draft: ServerConfig {
+        ServerConfig(id: server.id, name: name.trimmingCharacters(in: .whitespaces), address: address.trimmingCharacters(in: .whitespaces))
+    }
+
+    private var hasChanges: Bool { draft.name != server.name || draft.address != server.address }
+
+    var body: some View {
+        let isCurrent = server.id == app.settings.selectedServerID
+        Form {
+            TextField("Name", text: $name)
+                .onSubmit(save)
+            TextField("Address", text: $address, prompt: Text(verbatim: "http://127.0.0.1:11434"))
+                .onSubmit(save)
+            if draft.isValid {
                 LabeledContent("Connects to") {
-                    Text(verbatim: server.wrappedValue.url.absoluteString)
+                    Text(verbatim: draft.displayURL)
                         .textSelection(.enabled)
                 }
             } else {
@@ -152,10 +173,8 @@ private struct ServersSettingsView: View {
             }
 
             HStack {
-                Button("Test Connection") {
-                    test(server.wrappedValue)
-                }
-                .disabled(!server.wrappedValue.isValid || testResult == .testing)
+                Button("Test Connection", action: test)
+                    .disabled(!draft.isValid || testResult == .testing)
                 switch testResult {
                 case .testing:
                     ProgressView()
@@ -178,23 +197,40 @@ private struct ServersSettingsView: View {
                 case nil:
                     EmptyView()
                 }
+                Spacer()
+                Button("Save", action: save)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(!draft.isValid || !hasChanges)
             }
 
             if isCurrent {
                 Button("Reconnect") { app.serverDidChange() }
             } else {
-                Button("Use This Server") { app.selectServer(server.wrappedValue.id) }
-                    .disabled(!server.wrappedValue.isValid)
+                Button("Use This Server") { app.selectServer(server.id) }
+                    .disabled(!server.isValid || hasChanges)
             }
         }
         .formStyle(.grouped)
+        .onChange(of: address) { _, _ in testResult = nil }
     }
 
-    private func test(_ server: ServerConfig) {
+    private func save() {
+        guard draft.isValid, hasChanges else { return }
+        let settings = app.settings
+        guard let index = settings.servers.firstIndex(where: { $0.id == server.id }) else { return }
+        let addressChanged = settings.servers[index].url != draft.url
+        settings.servers[index] = draft
+        if addressChanged, server.id == settings.selectedServerID {
+            app.serverDidChange()
+        }
+    }
+
+    private func test() {
+        let url = draft.url
         testResult = .testing
         Task {
             do {
-                let version = try await OllamaClient(baseURL: server.url).version()
+                let version = try await OllamaClient(baseURL: url).version()
                 testResult = .success(version)
             } catch {
                 testResult = .failure(error.localizedDescription)

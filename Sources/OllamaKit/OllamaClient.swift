@@ -19,39 +19,95 @@ public struct OllamaClient: Sendable {
         return URLSession(configuration: configuration)
     }()
 
-    public init(baseURL: URL, session: URLSession = OllamaClient.defaultSession) {
+    /// Like `defaultSession`, without any proxy: requests to this Mac go straight to Ollama.
+    public static let loopbackSession: URLSession = {
+        let configuration = defaultSession.configuration
+        configuration.connectionProxyDictionary = [
+            kCFNetworkProxiesHTTPEnable as String: 0,
+            kCFNetworkProxiesHTTPSEnable as String: 0,
+            kCFNetworkProxiesSOCKSEnable as String: 0,
+            kCFNetworkProxiesProxyAutoConfigEnable as String: 0,
+        ]
+        return URLSession(configuration: configuration)
+    }()
+
+    public init(baseURL: URL, session: URLSession? = nil) {
         self.baseURL = baseURL
-        self.session = session
+        self.session = session ?? (Self.isLoopback(baseURL) ? Self.loopbackSession : Self.defaultSession)
     }
 
     /// Turns a user supplied address (`localhost`, `192.168.1.20:11434`, `https://ollama.example.com`)
     /// into a base URL. Without a port, plain HTTP uses Ollama's default port 11434.
+    ///
+    /// Also understood: a bare IPv6 address (`::1`), a port alone (`:8080`, this Mac), the bind
+    /// addresses `0.0.0.0` and `[::]` (this Mac), and a trailing `/api` copied from the API
+    /// docs. An explicit port, even 80, is kept. User names and passwords stay in the URL for
+    /// the requests; `displayString(for:)` hides them.
     public static func baseURL(from input: String) -> URL? {
+        normalizedURL(input, defaultHTTPPort: defaultPort)
+    }
+
+    /// The `OLLAMA_HOST` variable, read like the Ollama CLI does: `http://host` without a port
+    /// means port 80, and a bare host means port 11434.
+    public static func baseURL(fromEnvironment value: String) -> URL? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return normalizedURL(trimmed, defaultHTTPPort: trimmed.contains("://") ? 80 : defaultPort)
+    }
+
+    private static func normalizedURL(_ input: String, defaultHTTPPort: Int) -> URL? {
         var text = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return nil }
+        guard !text.isEmpty, !text.contains(where: \.isWhitespace) else { return nil }
         if let separator = text.range(of: "://") {
             let scheme = text[..<separator.lowerBound].lowercased()
             guard scheme == "http" || scheme == "https" else { return nil }
+            text = scheme + text[separator.lowerBound...]
         } else {
+            let hostPart = text.prefix { $0 != "/" }
+            let port = hostPart.dropFirst()
+            if hostPart.hasPrefix(":"), !port.isEmpty, port.allSatisfy(\.isASCII), port.allSatisfy(\.isNumber) {
+                // A port alone: this Mac.
+                text = "127.0.0.1" + text
+            } else if !hostPart.hasPrefix("["), hostPart.filter({ $0 == ":" }).count >= 2 {
+                // A bare IPv6 address.
+                text = "[" + hostPart + "]" + text.dropFirst(hostPart.count)
+            }
             text = "http://" + text
         }
         guard var components = URLComponents(string: text),
-              let host = components.host, !host.isEmpty,
-              !host.contains(" ")
+              let host = components.percentEncodedHost?.lowercased(), !host.isEmpty
         else { return nil }
-        if components.port == nil, components.scheme?.lowercased() == "http" {
-            components.port = defaultPort
-        }
-        // 0.0.0.0 is a bind address; connect through the loopback interface instead.
+        components.percentEncodedHost = host
+        // Bind addresses: connect through the loopback interface instead.
         if host == "0.0.0.0" {
-            components.host = "127.0.0.1"
+            components.percentEncodedHost = "127.0.0.1"
+        } else if host == "[::]" {
+            components.percentEncodedHost = "[::1]"
         }
-        while components.path.hasSuffix("/") {
-            components.path.removeLast()
+        if components.port == nil, components.scheme == "http" {
+            components.port = defaultHTTPPort
         }
+        var path = components.percentEncodedPath
+        while path.hasSuffix("/") { path.removeLast() }
+        if path.lowercased().hasSuffix("/api") { path.removeLast(4) }
+        while path.hasSuffix("/") { path.removeLast() }
+        components.percentEncodedPath = path
         components.query = nil
         components.fragment = nil
         return components.url
+    }
+
+    /// The URL as shown to people: without a user name or password.
+    public static func displayString(for url: URL) -> String {
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return url.absoluteString }
+        components.user = nil
+        components.password = nil
+        return components.url?.absoluteString ?? url.absoluteString
+    }
+
+    /// Whether the URL points to this Mac.
+    public static func isLoopback(_ url: URL) -> Bool {
+        guard let host = URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedHost?.lowercased() else { return false }
+        return ["localhost", "127.0.0.1", "[::1]"].contains(host)
     }
 
     // MARK: - Endpoints

@@ -14,6 +14,7 @@ import SwiftUI
 /// `OLLAMA_GUI_DEFAULTS` names a separate settings domain (the real settings are never
 /// read or written); `OLLAMA_GUI_V2_SETTINGS` points the version 2 import at a test file.
 /// Commands: `wait:seconds`, `section:name`, `select:name[,name…]`, `select-all`,
+/// `search:text`, `filter:all|local|cloud|vision|tools|thinking|embedding|image`, `reveal:name`,
 /// `delete-selection`, `cancel-dialogs`, `appearance:system|light|dark`, `size:width,height`,
 /// `chat:model`, `draft:text`, `markdown-sample`, `inspector`, `shot:name`, `print`, `quit`.
 @MainActor
@@ -70,8 +71,15 @@ enum ScriptDriver {
             app.section = SidebarSection(rawValue: argument) ?? .models
         case "select":
             app.modelSelection = Set(argument.split(separator: ",").map(String.init))
+        case "search":
+            app.modelSearch = argument
+        case "filter":
+            app.modelFilter = ModelFilter(rawValue: argument) ?? .all
+        case "reveal":
+            app.reveal(argument)
         case "select-all":
-            app.modelSelection = Set(app.models.map(\.name))
+            // Like ⌘A in the table: the models shown.
+            app.modelSelection = Set(app.visibleModels.map(\.name))
         case "delete-selection":
             // Only opens the confirmation: scripts never delete anything.
             app.requestDelete(Array(app.modelSelection))
@@ -137,7 +145,7 @@ enum ScriptDriver {
         if let request = app.deleteRequest {
             log("dialog: \(app.deleteTitle(for: request)) | \(app.deleteMessage(for: request).replacingOccurrences(of: "\n", with: " / "))")
         }
-        log("state: section=\(app.section?.rawValue ?? "-") connection=\(app.connection) models=\(app.models.count) selected=\(app.modelSelection.count) running=\(app.running.count) downloads=\(app.downloads.tasks.count) delete=\(app.deleteRequest?.names.count ?? 0) appearance=\(settings.appearance) keepAlive=\(settings.keepAliveSeconds) refresh=\(settings.refreshInterval) servers=\(settings.servers.map(\.address)) window=\(size)")
+        log("state: section=\(app.section?.rawValue ?? "-") connection=\(app.connection) models=\(app.models.count) visible=\(app.visibleModels.count) selected=\(app.modelSelection.count) search=\"\(app.modelSearch)\" filter=\(app.modelFilter.rawValue) running=\(app.running.count) downloads=\(app.downloads.tasks.count) delete=\(app.deleteRequest?.names.count ?? 0) appearance=\(settings.appearance) keepAlive=\(settings.keepAliveSeconds) refresh=\(settings.refreshInterval) servers=\(settings.servers.map(\.address)) window=\(size)")
     }
 
     private static func log(_ text: String) {

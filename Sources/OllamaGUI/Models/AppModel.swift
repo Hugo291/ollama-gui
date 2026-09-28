@@ -81,6 +81,14 @@ final class AppModel {
     // UI state
     var section: SidebarSection? = .models
     var modelSelection: Set<String> = []
+    /// Search and filter of the Models table. Models they hide leave the selection, so
+    /// that nothing acts on a model that isn't shown.
+    var modelSearch = "" {
+        didSet { pruneSelection() }
+    }
+    var modelFilter: ModelFilter = .all {
+        didSet { pruneSelection() }
+    }
     var isPullSheetPresented = false
     var pullSheetPrefill = ""
     var copyRequest: CopyRequest?
@@ -154,7 +162,7 @@ final class AppModel {
             models = list.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
             hasLoadedModels = true
             let names = Set(models.map(\.name))
-            modelSelection = modelSelection.filter(names.contains)
+            pruneSelection()
             updates = updates.filter { names.contains($0.key) }
         } catch {
             // The next refresh reports connection problems.
@@ -187,6 +195,24 @@ final class AppModel {
     }
 
     // MARK: - Queries
+
+    /// Models the Models table shows: the filter and the search applied, not sorted.
+    var visibleModels: [OllamaModel] {
+        let query = modelSearch.trimmingCharacters(in: .whitespaces)
+        return models
+            .filter { modelFilter.matches($0) }
+            .filter { model in
+                query.isEmpty
+                    || model.name.localizedCaseInsensitiveContains(query)
+                    || (model.family?.localizedCaseInsensitiveContains(query) ?? false)
+            }
+    }
+
+    private func pruneSelection() {
+        let visible = Set(visibleModels.map(\.name))
+        let pruned = modelSelection.intersection(visible)
+        if pruned != modelSelection { modelSelection = pruned }
+    }
 
     /// The model selected in the Models table, when exactly one is selected.
     var selectedModel: OllamaModel? {
@@ -416,8 +442,13 @@ final class AppModel {
         section = .playground
     }
 
+    /// Shows a model in the Models table, clearing a search or filter that hides it.
     func reveal(_ name: String) {
         section = .models
+        if !visibleModels.contains(where: { $0.name == name }) {
+            modelSearch = ""
+            modelFilter = .all
+        }
         modelSelection = [name]
     }
 

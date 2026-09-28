@@ -19,6 +19,10 @@ struct PlaygroundView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 Transcript()
+                    // Links written by a model open only when they are web pages.
+                    .environment(\.openURL, OpenURLAction { url in
+                        ["http", "https"].contains(url.scheme?.lowercased() ?? "") ? .systemAction : .discarded
+                    })
             }
             Divider()
             Composer()

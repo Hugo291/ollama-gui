@@ -50,16 +50,16 @@ extension OllamaModel {
 
 struct ModelsView: View {
     private var app: AppModel { .shared }
-    @State private var searchText = ""
-    @State private var filter: ModelFilter = .all
     @State private var sortOrder = [KeyPathComparator(\OllamaModel.name, comparator: .localizedStandard)]
     @State private var showInspector = true
 
     var body: some View {
+        @Bindable var app = app
+
         content
             .navigationTitle(Text("Models"))
             .navigationSubtitle(subtitle)
-            .searchable(text: $searchText, placement: .toolbar, prompt: Text("Filter models"))
+            .searchable(text: $app.modelSearch, placement: .toolbar, prompt: Text("Filter models"))
             .toolbar { toolbar }
             .inspector(isPresented: $showInspector) {
                 ModelInspector()
@@ -85,22 +85,14 @@ struct ModelsView: View {
                 Button("Discover Models") { app.section = .discover }
             }
         } else if rows.isEmpty {
-            ContentUnavailableView.search(text: searchText)
+            ContentUnavailableView.search(text: app.modelSearch)
         } else {
             ModelsTable(rows: rows, sortOrder: $sortOrder, showInspector: $showInspector)
         }
     }
 
     private var rows: [OllamaModel] {
-        let query = searchText.trimmingCharacters(in: .whitespaces)
-        return app.models
-            .filter { filter.matches($0) }
-            .filter { model in
-                query.isEmpty
-                    || model.name.localizedCaseInsensitiveContains(query)
-                    || (model.family?.localizedCaseInsensitiveContains(query) ?? false)
-            }
-            .sorted(using: sortOrder)
+        app.visibleModels.sorted(using: sortOrder)
     }
 
     private var subtitle: String {
@@ -115,9 +107,11 @@ struct ModelsView: View {
 
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
+        @Bindable var app = app
+
         ToolbarItemGroup {
             Menu {
-                Picker(selection: $filter) {
+                Picker(selection: $app.modelFilter) {
                     ForEach(ModelFilter.allCases) { filter in
                         Text(filter.title).tag(filter)
                     }
@@ -127,7 +121,7 @@ struct ModelsView: View {
                 .pickerStyle(.inline)
                 .labelsHidden()
             } label: {
-                Label("Filter", systemImage: filter == .all ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+                Label("Filter", systemImage: app.modelFilter == .all ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
             }
             .help(Text("Show only some kinds of models"))
             .accessibilityLabel(Text("Filter"))

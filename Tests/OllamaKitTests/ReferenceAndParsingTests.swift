@@ -59,9 +59,50 @@ struct BaseURLTests {
         ("https://example.com/ollama/", "https://example.com/ollama"),
         ("0.0.0.0:11434", "http://127.0.0.1:11434"),
         ("[::1]:11434", "http://[::1]:11434"),
+        // The same cases as version 2.
+        ("http://example.com:80", "http://example.com:80"),
+        ("example.com:80/ollama", "http://example.com:80/ollama"),
+        ("[::1]", "http://[::1]:11434"),
+        ("http://[::1]:8080", "http://[::1]:8080"),
+        ("::1", "http://[::1]:11434"),
+        (":8080", "http://127.0.0.1:8080"),
+        ("[::]:11434", "http://[::1]:11434"),
+        ("http://localhost:11434/api", "http://localhost:11434"),
+        ("https://example.com/ollama/api/", "https://example.com/ollama"),
+        ("HTTP://Example.com", "http://example.com:11434"),
     ])
-    func normalizesAddresses(input: String, expected: String) {
-        #expect(OllamaClient.baseURL(from: input)?.absoluteString == expected)
+    func normalizesAddresses(input: String, expected: String) throws {
+        let url = try #require(OllamaClient.baseURL(from: input))
+        #expect(url.absoluteString == expected)
+        // What is shown parses back to the same address.
+        #expect(OllamaClient.baseURL(from: url.absoluteString) == url)
+    }
+
+    @Test func hidesCredentials() throws {
+        let url = try #require(OllamaClient.baseURL(from: "https://user:secret@example.com"))
+        #expect(url.absoluteString == "https://user:secret@example.com")
+        #expect(OllamaClient.displayString(for: url) == "https://example.com")
+        let port80 = try #require(OllamaClient.baseURL(from: "http://user:secret@example.com:80"))
+        #expect(port80.absoluteString == "http://user:secret@example.com:80")
+        #expect(OllamaClient.displayString(for: port80) == "http://example.com:80")
+    }
+
+    @Test(arguments: [
+        ("127.0.0.1", "http://127.0.0.1:11434"),
+        ("0.0.0.0:11434", "http://127.0.0.1:11434"),
+        ("http://example.com", "http://example.com:80"),
+        ("http://example.com:8080", "http://example.com:8080"),
+        ("https://example.com", "https://example.com"),
+    ])
+    func readsOllamaHostLikeTheCLI(value: String, expected: String) {
+        #expect(OllamaClient.baseURL(fromEnvironment: value)?.absoluteString == expected)
+    }
+
+    @Test func loopbackAddresses() throws {
+        for address in ["localhost", "127.0.0.1", "::1", ":8080", "0.0.0.0"] {
+            #expect(OllamaClient.isLoopback(try #require(OllamaClient.baseURL(from: address))), "\(address)")
+        }
+        #expect(!OllamaClient.isLoopback(try #require(OllamaClient.baseURL(from: "192.168.1.20"))))
     }
 
     @Test(arguments: ["", "ftp://host", "http://", "not a host"])

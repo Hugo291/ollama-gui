@@ -22,14 +22,14 @@ struct ServerConfig: Codable, Identifiable, Hashable {
 
     var isValid: Bool { OllamaClient.baseURL(from: address) != nil }
 
+    /// The address as shown: normalized, without a user name or password.
+    var displayURL: String { OllamaClient.displayString(for: url) }
+
     /// Whether the server runs on this Mac (enables "Start Ollama" and memory gauges).
-    var isLocal: Bool {
-        guard let host = url.host()?.lowercased() else { return false }
-        return ["localhost", "127.0.0.1", "::1", "[::1]"].contains(host)
-    }
+    var isLocal: Bool { OllamaClient.isLoopback(url) }
 
     static func defaultLocal() -> ServerConfig {
-        let environment = ProcessInfo.processInfo.environment["OLLAMA_HOST"].flatMap { OllamaClient.baseURL(from: $0) }
+        let environment = ProcessInfo.processInfo.environment["OLLAMA_HOST"].flatMap { OllamaClient.baseURL(fromEnvironment: $0) }
         return ServerConfig(name: String(localized: "This Mac"), address: environment?.absoluteString ?? "http://127.0.0.1:11434")
     }
 }

@@ -335,7 +335,7 @@ struct ServerUnavailableView: View {
                 Label("Ollama Is Not Reachable", systemImage: "bolt.horizontal.circle")
             } description: {
                 VStack(spacing: 6) {
-                    Text("Couldn't connect to \(app.settings.currentServer.url.absoluteString).")
+                    Text("Couldn't connect to \(app.settings.currentServer.displayURL).")
                     Text(verbatim: message)
                         .font(.caption)
                         .foregroundStyle(.tertiary)

@@ -232,7 +232,8 @@ public struct RunningModel: Decodable, Identifiable, Hashable, Sendable {
     public var processorLabel: String {
         if sizeVRAM <= 0 { return "100% CPU" }
         if sizeVRAM >= size { return "100% GPU" }
-        let cpu = Int((Double(size - sizeVRAM) / Double(size) * 100).rounded())
+        // Split between the two: never shown as 0% or 100% on either side.
+        let cpu = min(99, max(1, Int((Double(size - sizeVRAM) / Double(size) * 100).rounded())))
         return "\(cpu)%/\(100 - cpu)% CPU/GPU"
     }
 

@@ -236,3 +236,6 @@
 "System" = "Système";
 "Light" = "Clair";
 "Dark" = "Sombre";
+
+/* Settings: server editor */
+"Save" = "Enregistrer";
