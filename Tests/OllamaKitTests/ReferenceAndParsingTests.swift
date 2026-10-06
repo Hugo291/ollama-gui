@@ -194,6 +194,12 @@ struct LibraryParserTests {
         #expect(community.capabilities.isEmpty)
     }
 
+    @Test func preservesDecisionCapabilityFromLibraryBadges() throws {
+        let html = Self.searchHTML.replacingOccurrences(of: ">thinking</span>", with: ">decision</span>")
+        let model = try #require(LibraryParser.parseSearch(html).first)
+        #expect(model.capabilities == ["tools", "decision"])
+    }
+
     @Test func parsesTags() throws {
         let tags = LibraryParser.parseTags(Self.tagsHTML)
         #expect(tags.map(\.name) == ["qwen3.8:latest", "qwen3.8:27b-mlx", "kimi-k3:cloud"])

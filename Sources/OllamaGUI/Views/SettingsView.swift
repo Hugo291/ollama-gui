@@ -27,6 +27,7 @@ struct SettingsView: View {
 
 private struct GeneralSettingsView: View {
     private var app: AppModel { .shared }
+    @State private var confirmsOllamaUpdate = false
 
     var body: some View {
         @Bindable var settings = app.settings
@@ -60,6 +61,38 @@ private struct GeneralSettingsView: View {
                 Toggle("Show in menu bar", isOn: $settings.showMenuBarExtra)
             }
             Section {
+                LabeledContent("Installed Version") {
+                    Text(verbatim: app.localOllamaVersion ?? "—")
+                }
+                ollamaUpdateStatus
+                if case .available(let releases) = app.ollamaUpdateState {
+                    Picker("Version to Install", selection: Binding(
+                        get: { app.selectedOllamaReleaseTag },
+                        set: { app.selectedOllamaReleaseTag = $0 }
+                    )) {
+                        ForEach(releases, id: \.tagName) { release in
+                            Text(verbatim: release.isPrerelease ? "\(release.version) — \(String(localized: "Preview"))" : release.version)
+                                .tag(Optional(release.tagName))
+                        }
+                    }
+                }
+                HStack {
+                    Spacer()
+                    if case .available = app.ollamaUpdateState {
+                        Button("Refresh Versions") { Task { await app.checkOllamaUpdate() } }
+                    }
+                    ollamaUpdateButton
+                }
+            } header: {
+                Text("Ollama")
+            } footer: {
+                if !settings.currentServer.isLocal {
+                    Text("Updates can only be installed for Ollama running on this Mac.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Section {
                 LabeledContent("Version") {
                     Text(verbatim: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—")
                 }
@@ -77,6 +110,85 @@ private struct GeneralSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .task(id: app.canUpdateLocalOllama) {
+            if app.canUpdateLocalOllama, case .idle = app.ollamaUpdateState {
+                await app.checkOllamaUpdate()
+            }
+        }
+        .alert(String(localized: "Update Ollama?"), isPresented: $confirmsOllamaUpdate) {
+            Button("Cancel", role: .cancel) {}
+            Button("Update") { Task { await app.installOllamaUpdate() } }
+        } message: {
+            if let release = app.selectedOllamaRelease {
+                Text("Ollama will stop briefly while version \(release.version) is installed, then restart automatically.")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var ollamaUpdateStatus: some View {
+        switch app.ollamaUpdateState {
+        case .idle:
+            EmptyView()
+        case .checking:
+            Label("Checking for Ollama updates…", systemImage: "arrow.triangle.2.circlepath")
+                .foregroundStyle(.secondary)
+        case .upToDate(let version):
+            Label("Ollama \(version) is up to date.", systemImage: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+        case .available(let releases):
+            Label("\(releases.count) Ollama versions are available.", systemImage: "arrow.down.circle.fill")
+                .foregroundStyle(.blue)
+        case .installing(let release):
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Installing Ollama \(release.version)…", systemImage: "arrow.down.circle")
+                HStack {
+                    Text(verbatim: app.ollamaInstallProgress.stage.title)
+                        .font(.callout)
+                    Spacer()
+                    if let fraction = app.ollamaInstallProgress.fraction {
+                        Text(fraction, format: .percent.precision(.fractionLength(0)))
+                            .font(.callout.weight(.semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(.primary)
+                    }
+                }
+                ProgressView(value: app.ollamaInstallProgress.fraction)
+                    .progressViewStyle(.linear)
+                if app.ollamaInstallProgress.fraction != nil {
+                    Text(verbatim: "\(ByteCountFormatter.string(fromByteCount: app.ollamaInstallProgress.receivedBytes, countStyle: .file)) / \(ByteCountFormatter.string(fromByteCount: app.ollamaInstallProgress.totalBytes, countStyle: .file))")
+                        .font(.caption)
+                }
+            }
+            .foregroundStyle(.secondary)
+        case .installed(let version):
+            Label("Ollama \(version) was installed.", systemImage: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+        case .failed(let message):
+            Label {
+                Text(verbatim: message)
+            } icon: {
+                Image(systemName: "exclamationmark.triangle.fill")
+            }
+            .foregroundStyle(.orange)
+        }
+    }
+
+    @ViewBuilder
+    private var ollamaUpdateButton: some View {
+        switch app.ollamaUpdateState {
+        case .available:
+            Button("Install Selected Version") { confirmsOllamaUpdate = true }
+                .disabled(app.selectedOllamaRelease == nil)
+        case .installing:
+            EmptyView()
+        case .checking:
+            ProgressView()
+                .controlSize(.small)
+        default:
+            Button("Check for Ollama Updates") { Task { await app.checkOllamaUpdate() } }
+                .disabled(!app.canUpdateLocalOllama)
+        }
     }
 }
 

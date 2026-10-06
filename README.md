@@ -21,10 +21,11 @@
 ## Features
 
 **Models**
-- Every installed model with its size, parameters, quantization, capabilities (vision, tools, thinking, embedding, image, audio) and cloud or local origin. Sortable, searchable, filterable.
+- Every installed model with its size, parameters, quantization, capabilities (vision, tools, thinking, decision, embedding, image, audio) and cloud or local origin. Sortable, searchable, filterable.
 - **Multiple selection** (⌘-click, Shift-click, ⌘A) to update, unload or delete several models at once.
 - Inspector with the full configuration: parameters, system prompt, template, Modelfile, license, model info and tensors.
 - **Update check** against the Ollama registry (compares manifest digests, nothing is downloaded) and one-click update of one or all outdated models.
+- **Ollama versions** in Settings: choose a recent stable or preview release, including older versions, and install it with download percentage, stage details, SHA-256 verification and an automatic restart of the local macOS Ollama application.
 - Duplicate, rename, **customize** (a new model on top of an existing one, with its own system prompt, temperature, context window, top P and seed) and delete.
 
 **Downloads and library**
@@ -94,6 +95,7 @@ CI builds, tests and smoke-tests the app on every push, and attaches the build t
 
 - Everything goes through the [Ollama REST API](https://docs.ollama.com/api) of the selected server (`/api/tags`, `/api/ps`, `/api/show`, `/api/pull`, `/api/create`, `/api/copy`, `/api/delete`, `/api/chat`).
 - **Updates**: the digest of a local model is the SHA-256 of its manifest. The app asks `registry.ollama.ai` for the digest of the current manifest (a `HEAD` request) and compares.
+- **Ollama versions**: reads the 100 most recent official GitHub releases and lists those with a macOS archive and checksums. Installation verifies the archive, stops the application and its bundled server, replaces the application, restarts it and checks the server version.
 - **Discover**: ollama.com has no public search API, so the app reads its public search and tags pages. If the site layout changes, Discover may show fewer details until the parser is updated; pulling by name always works.
 - **Servers**: an address without a port uses Ollama's default port 11434 (`192.168.1.20` → `http://192.168.1.20:11434`). The `OLLAMA_HOST` environment variable sets the default server.
 
@@ -107,7 +109,7 @@ CI builds, tests and smoke-tests the app on every push, and attaches the build t
 
 ## Privacy
 
-No analytics, no account. The app only talks to the Ollama servers you configure, plus `ollama.com` when you open Discover and `registry.ollama.ai` when you check for updates.
+No analytics, no account. The app talks to the Ollama servers you configure, `ollama.com` when you open Discover, `registry.ollama.ai` when you check for model updates, and GitHub when you browse or install official Ollama releases in Settings.
 
 ## Français
 

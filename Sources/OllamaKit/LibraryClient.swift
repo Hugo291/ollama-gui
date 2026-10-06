@@ -84,7 +84,7 @@ public struct LibraryClient: Sendable {
         self.session = session
     }
 
-    /// `capability` is one of `vision`, `tools`, `thinking`, `embedding`, `cloud`. Pages after the
+    /// `capability` is one of `vision`, `tools`, `thinking`, `decision`, `embedding`, `cloud`. Pages after the
     /// first are the fragments the site loads while scrolling.
     public func search(query: String, capability: String? = nil, sort: LibrarySort = .popular, page: Int = 1) async throws -> LibraryPage {
         var components = URLComponents(url: Self.baseURL.appending(path: "search"), resolvingAgainstBaseURL: false)!

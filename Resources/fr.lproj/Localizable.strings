@@ -27,6 +27,9 @@
 "Capability" = "Capacité";
 "Chat" = "Discuter";
 "Check for model updates at launch" = "Rechercher les mises à jour des modèles au lancement";
+"Check for Ollama Updates" = "Rechercher les mises à jour d’Ollama";
+"Checking for Ollama updates…" = "Recherche des mises à jour d’Ollama…";
+"Connect to Ollama on this Mac before checking for updates." = "Connectez-vous à Ollama sur ce Mac avant de rechercher des mises à jour.";
 "Check for Updates" = "Rechercher des mises à jour";
 "Check the Ollama registry for newer versions of your models" = "Vérifier sur le registre Ollama si vos modèles ont des versions plus récentes";
 "Choose a different name." = "Choisissez un autre nom.";
@@ -88,6 +91,9 @@
 "Insert" = "Insertion";
 "Inspector" = "Inspecteur";
 "Installed" = "Installé";
+"Installed Version" = "Version installée";
+"Install Selected Version" = "Installer la version sélectionnée";
+"Installing Ollama %@…" = "Installation d’Ollama %@…";
 "Keep Loaded" = "Garder chargé";
 "Keep models loaded for" = "Garder les modèles chargés pendant";
 "Keep the model in memory for longer" = "Garder le modèle en mémoire plus longtemps";
@@ -129,9 +135,15 @@
 "Not reachable" = "Injoignable";
 "Now" = "Maintenant";
 "OK" = "OK";
+"Ollama" = "Ollama";
 "Ollama GUI" = "Ollama GUI";
 "Ollama has no rename: the model is copied under the new name, then the original name is removed. No data is downloaded again." = "Ollama ne sait pas renommer : le modèle est copié sous le nouveau nom, puis l’ancien nom est supprimé. Aucune donnée n’est retéléchargée.";
 "Ollama Is Not Reachable" = "Ollama est injoignable";
+"Ollama %@ is up to date." = "Ollama %@ est à jour.";
+"Ollama %@ was installed." = "Ollama %@ a été installé.";
+"Ollama GUI does not have permission to replace Ollama in Applications." = "Ollama GUI n’a pas l’autorisation de remplacer Ollama dans Applications.";
+"Ollama was updated, but the new server did not start in time." = "Ollama a été mis à jour, mais le nouveau serveur n’a pas démarré à temps.";
+"Ollama will stop briefly while version %@ is installed, then restart automatically." = "Ollama s’arrêtera brièvement pendant l’installation de la version %@, puis redémarrera automatiquement.";
 "ollama.com" = "ollama.com";
 "Open Model Page" = "Ouvrir la page du modèle";
 "Open Ollama GUI" = "Ouvrir Ollama GUI";
@@ -140,6 +152,7 @@
 "Playground" = "Bac à sable";
 "Popular" = "Populaires";
 "Preparing layers…" = "Préparation des couches…";
+"Preview" = "Préversion";
 "Processor" = "Processeur";
 "Pull" = "Télécharger";
 "Pull a Model" = "Télécharger un modèle";
@@ -194,6 +207,10 @@
 "The copy shares its data with the original, so it takes no extra disk space. Useful to give a model a shorter name." = "La copie partage ses données avec l’original : elle n’occupe aucun espace disque supplémentaire. Pratique pour donner un nom plus court à un modèle.";
 "The first message loads the model into memory; it stays loaded for %@ after the last reply." = "Le premier message charge le modèle en mémoire ; il y reste %@ après la dernière réponse.";
 "The operation ended before it completed." = "L’opération s’est arrêtée avant la fin.";
+"The downloaded archive does not contain a valid Ollama application." = "L’archive téléchargée ne contient pas une application Ollama valide.";
+"The downloaded Ollama archive failed its SHA-256 verification." = "La vérification SHA-256 de l’archive Ollama téléchargée a échoué.";
+"The Ollama application could not be found on this Mac." = "L’application Ollama est introuvable sur ce Mac.";
+"This Ollama release does not contain the expected macOS files." = "Cette version d’Ollama ne contient pas les fichiers macOS attendus.";
 "The server address is not valid." = "L’adresse du serveur n’est pas valide.";
 "The server responded with HTTP status %lld." = "Le serveur a répondu avec le statut HTTP %lld.";
 "The server sent an unexpected response." = "Le serveur a envoyé une réponse inattendue.";
@@ -218,6 +235,10 @@
 "Unloads at %@" = "Déchargement à %@";
 "Up to Date" = "À jour";
 "Update" = "Mettre à jour";
+"Update Ollama?" = "Mettre à jour Ollama ?";
+"Updates can only be installed for Ollama running on this Mac." = "Les mises à jour ne peuvent être installées que pour Ollama exécuté sur ce Mac.";
+"Version to Install" = "Version à installer";
+"%lld Ollama versions are available." = "%lld versions d’Ollama sont disponibles.";
 "Update All" = "Tout mettre à jour";
 "Update Available" = "Mise à jour disponible";
 "Update available" = "Mise à jour disponible";
@@ -250,3 +271,16 @@
 "Version" = "Version";
 "Source Code" = "Code source";
 "An independent open-source project, not affiliated with Ollama." = "Un projet open source indépendant, sans lien avec Ollama.";
+
+"Refresh Versions" = "Actualiser les versions";
+
+"Downloading Ollama…" = "Téléchargement d’Ollama…";
+"Downloading verification file…" = "Téléchargement du fichier de vérification…";
+"Verifying the download…" = "Vérification du téléchargement…";
+"Extracting Ollama…" = "Décompression d’Ollama…";
+"Stopping Ollama…" = "Arrêt d’Ollama…";
+"Replacing the Ollama application…" = "Installation de l’application Ollama…";
+"Restarting Ollama and checking its version…" = "Redémarrage d’Ollama et vérification de sa version…";
+
+"Decision" = "Décision";
+"Ollama could not be stopped. The installed application has not been replaced." = "Impossible d’arrêter Ollama. L’application installée n’a pas été remplacée.";

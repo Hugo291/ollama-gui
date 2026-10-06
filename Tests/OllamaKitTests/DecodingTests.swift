@@ -17,11 +17,12 @@ struct DecodingTests {
            "capabilities":["completion"]},
           {"name":"bge-m3:latest","size":1157672605,"digest":"79076464","capabilities":["embedding"]},
           {"name":"x/z-image-turbo:latest","size":12773500825,"digest":"77b78ce4","capabilities":["image"]},
-          {"name":"legacy:latest","size":10,"digest":"00"}
+          {"name":"legacy:latest","size":10,"digest":"00"},
+          {"name":"nimble:9b","size":9527501312,"digest":"01","capabilities":["decision"]}
         ]}
         """
         let models = try JSONDecoder().decode(TagsResponse.self, from: Data(json.utf8)).models
-        #expect(models.count == 5)
+        #expect(models.count == 6)
 
         let cloud = models[0]
         #expect(cloud.isCloud)
@@ -42,6 +43,8 @@ struct DecodingTests {
         #expect(models[2].supports(.embedding))
         #expect(!models[3].canLoad)
         #expect(models[4].canChat, "Models without capabilities are assumed to be text models")
+        #expect(models[5].supports(.decision))
+        #expect(!models[5].canChat, "Decision models use a dedicated API")
     }
 
     @Test func decodesRunningModels() throws {

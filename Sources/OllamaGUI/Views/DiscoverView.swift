@@ -6,6 +6,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
     case vision
     case tools
     case thinking
+    case decision
     case embedding
     case cloud
 
@@ -20,6 +21,7 @@ enum LibraryFilter: String, CaseIterable, Identifiable {
         case .vision: LocalizedStringKey("Vision")
         case .tools: LocalizedStringKey("Tools")
         case .thinking: LocalizedStringKey("Thinking")
+        case .decision: LocalizedStringKey("Decision")
         case .embedding: LocalizedStringKey("Embedding")
         case .cloud: LocalizedStringKey("Cloud")
         }

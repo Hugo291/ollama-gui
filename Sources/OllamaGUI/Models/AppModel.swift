@@ -76,6 +76,9 @@ final class AppModel {
     private(set) var updates: [String: UpdateStatus] = [:]
     private(set) var isCheckingUpdates = false
     private(set) var lastUpdateCheck: Date?
+    private(set) var ollamaUpdateState: OllamaUpdateState = .idle
+    var ollamaInstallProgress = OllamaInstallProgress()
+    var selectedOllamaReleaseTag: String?
     /// Models being loaded or unloaded.
     private(set) var busyModels: Set<String> = []
 
@@ -200,6 +203,8 @@ final class AppModel {
         modelSelection = []
         detailsCache = [:]
         didRunLaunchUpdateCheck = false
+        ollamaUpdateState = .idle
+        selectedOllamaReleaseTag = nil
         Task { await refresh(forceModels: true) }
     }
 
@@ -480,6 +485,79 @@ final class AppModel {
                 await refresh(forceModels: true)
                 if connection.isConnected { return }
             }
+        }
+    }
+
+    var localOllamaVersion: String? {
+        guard settings.currentServer.isLocal, case .connected(let version) = connection else { return nil }
+        return version
+    }
+
+    var canUpdateLocalOllama: Bool {
+        settings.currentServer.isLocal && OllamaLauncher.appURL != nil && localOllamaVersion != nil
+    }
+
+    var selectedOllamaRelease: OllamaRelease? {
+        guard case .available(let releases) = ollamaUpdateState else { return nil }
+        return releases.first { $0.tagName == selectedOllamaReleaseTag }
+    }
+
+    func checkOllamaUpdate() async {
+        guard let version = localOllamaVersion else {
+            ollamaUpdateState = .failed(String(localized: "Connect to Ollama on this Mac before checking for updates."))
+            return
+        }
+        guard OllamaLauncher.appURL != nil else {
+            ollamaUpdateState = .failed(OllamaUpdateError.missingApplication.localizedDescription)
+            return
+        }
+        ollamaUpdateState = .checking
+        do {
+            let releases = try await OllamaReleaseClient().availableVersions()
+            if !releases.isEmpty {
+                ollamaUpdateState = .available(releases)
+                selectedOllamaReleaseTag = (releases.first { !$0.isPrerelease } ?? releases[0]).tagName
+            } else {
+                ollamaUpdateState = .upToDate(version)
+                selectedOllamaReleaseTag = nil
+            }
+        } catch {
+            ollamaUpdateState = .failed(error.localizedDescription)
+            selectedOllamaReleaseTag = nil
+        }
+    }
+
+    private func updateOllamaInstallProgress(_ progress: OllamaInstallProgress) {
+        guard case .installing = ollamaUpdateState,
+              progress.stage.rawValue >= ollamaInstallProgress.stage.rawValue else { return }
+        if progress.stage == ollamaInstallProgress.stage,
+           progress.receivedBytes < ollamaInstallProgress.receivedBytes { return }
+        ollamaInstallProgress = progress
+    }
+
+    func installOllamaUpdate() async {
+        guard let release = selectedOllamaRelease, let applicationURL = OllamaLauncher.appURL else { return }
+        ollamaInstallProgress = OllamaInstallProgress()
+        ollamaUpdateState = .installing(release)
+        do {
+            try await OllamaUpdater.install(release, replacing: applicationURL) { [weak self] progress in
+                await self?.updateOllamaInstallProgress(progress)
+            }
+            ollamaInstallProgress = .init(stage: .restarting)
+            try await OllamaUpdater.launch(applicationURL)
+            connection = .connecting
+            for _ in 0..<30 {
+                try? await Task.sleep(for: .seconds(1))
+                await refresh(forceModels: true)
+                if localOllamaVersion == release.version {
+                    ollamaUpdateState = .installed(release.version)
+                    return
+                }
+            }
+            ollamaUpdateState = .failed(String(localized: "Ollama was updated, but the new server did not start in time."))
+        } catch {
+            OllamaLauncher.launch()
+            ollamaUpdateState = .failed(error.localizedDescription)
         }
     }
 }

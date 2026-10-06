@@ -8,6 +8,7 @@ enum ModelFilter: String, CaseIterable, Identifiable {
     case vision
     case tools
     case thinking
+    case decision
     case embedding
     case image
 
@@ -21,6 +22,7 @@ enum ModelFilter: String, CaseIterable, Identifiable {
         case .vision: LocalizedStringKey("Vision")
         case .tools: LocalizedStringKey("Tools")
         case .thinking: LocalizedStringKey("Thinking")
+        case .decision: LocalizedStringKey("Decision")
         case .embedding: LocalizedStringKey("Embedding")
         case .image: LocalizedStringKey("Image")
         }
@@ -34,6 +36,7 @@ enum ModelFilter: String, CaseIterable, Identifiable {
         case .vision: model.supports(.vision)
         case .tools: model.supports(.tools)
         case .thinking: model.supports(.thinking)
+        case .decision: model.supports(.decision)
         case .embedding: model.supports(.embedding)
         case .image: model.supports(.image)
         }

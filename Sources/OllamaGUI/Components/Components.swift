@@ -9,6 +9,7 @@ enum ModelKind {
     case text
     case vision
     case embedding
+    case decision
     case image
     case cloud
 
@@ -19,6 +20,8 @@ enum ModelKind {
             self = .image
         } else if model.supports(.embedding) {
             self = .embedding
+        } else if model.supports(.decision) {
+            self = .decision
         } else if model.supports(.vision) {
             self = .vision
         } else {
@@ -28,6 +31,7 @@ enum ModelKind {
 
     var systemImage: String {
         switch self {
+        case .decision: "arrow.triangle.branch"
         case .text: "text.bubble.fill"
         case .vision: "eye.fill"
         case .embedding: "point.3.connected.trianglepath.dotted"
@@ -38,6 +42,7 @@ enum ModelKind {
 
     var tint: Color {
         switch self {
+        case .decision: .mint
         case .text: .blue
         case .vision: .purple
         case .embedding: .orange
@@ -99,6 +104,7 @@ enum CapabilityStyle {
         case "vision": Text("Vision")
         case "tools": Text("Tools")
         case "thinking": Text("Thinking")
+        case "decision": Text("Decision")
         case "embedding": Text("Embedding")
         case "image": Text("Image")
         case "audio": Text("Audio")
@@ -114,6 +120,7 @@ enum CapabilityStyle {
         case "vision": "eye"
         case "tools": "wrench.and.screwdriver"
         case "thinking": "brain"
+        case "decision": "arrow.triangle.branch"
         case "embedding": "point.3.connected.trianglepath.dotted"
         case "image": "photo"
         case "audio": "waveform"
@@ -129,6 +136,7 @@ enum CapabilityStyle {
         case "vision": .purple
         case "tools": .orange
         case "thinking": .pink
+        case "decision": .mint
         case "embedding": .brown
         case "image": .indigo
         case "audio": .green

@@ -8,6 +8,7 @@ public enum Capability: String, CaseIterable, Sendable {
     case vision
     case tools
     case thinking
+    case decision
     case embedding
     case image
     case audio
