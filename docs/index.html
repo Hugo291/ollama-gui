@@ -46,7 +46,7 @@
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
     img { max-width: 100%; height: auto; display: block; }
-    code { font: 0.88em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--bg-alt); border: 1px solid var(--stroke); border-radius: 6px; padding: 1px 6px; }
+    code { font: 0.88em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--bg-alt); border: 1px solid var(--stroke); border-radius: 6px; padding: 1px 6px; overflow-wrap: anywhere; user-select: all; -webkit-user-select: all; }
     .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
 
     /* Language: only the content of the chosen language is shown. */
@@ -68,6 +68,8 @@
     .button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
     .button svg { width: 18px; height: 18px; flex: none; }
     .button small { font-weight: 400; opacity: 0.8; }
+    .hero .command { margin: 18px 0 0; font-size: 15px; color: var(--text-2); }
+    .hero .command code { display: inline-block; padding: 6px 12px; border-radius: 10px; color: var(--text); }
     .hero .meta { margin-top: 14px; font-size: 14px; color: var(--text-2); }
 
     .shot { margin: 34px auto 0; border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); border: 1px solid var(--stroke); }
@@ -93,7 +95,6 @@
     .install ol { margin: 8px 0 0; padding-left: 20px; color: var(--text-2); font-size: 15px; }
     .install li { margin-bottom: 6px; }
     .install p { margin-top: 8px; }
-    .install code { overflow-wrap: anywhere; }
 
     footer { padding: 36px 0 48px; color: var(--text-2); font-size: 14px; text-align: center; }
     footer .slint { display: inline-block; margin-top: 14px; }
@@ -146,6 +147,7 @@
           <span><span lang="en">Windows (version 2.2)</span><span lang="fr">Windows (version 2.2)</span></span>
         </a>
       </div>
+      <p class="command"><span lang="en">or in Terminal:</span><span lang="fr">ou dans le Terminal :</span> <code>curl -fsSL https://raw.githubusercontent.com/Hugo291/ollama-gui/main/install.sh | sh</code></p>
       <p class="meta">
         <span lang="en">Free and open source (MIT) · macOS 14+ (Apple silicon and Intel) · Windows 10 and 11 (64-bit): version 2.2, no longer updated · <a href="https://github.com/Hugo291/ollama-gui/releases">All releases</a></span>
         <span lang="fr">Gratuit et open source (MIT) · macOS 14+ (Apple silicon et Intel) · Windows 10 et 11 (64 bits) : version 2.2, sans mises à jour · <a href="https://github.com/Hugo291/ollama-gui/releases">Toutes les versions</a></span>
