@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds "Ollama GUI.app" (universal arm64 + x86_64) into dist/, plus a zip for releases.
+# Builds "Ollama GUI.app" (universal arm64 + x86_64) into dist/, plus a zip and a disk image for releases.
 #
 #   scripts/build-app.sh                  # release build, version from VERSION
 #   ARCHS=arm64 scripts/build-app.sh      # faster, Apple silicon only
@@ -51,5 +51,17 @@ ZIP="$DIST/OllamaGUI-macOS.zip"
 rm -f "$ZIP"
 ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
 
+# The download for people: the app beside a shortcut to Applications.
+# install.sh and the in-app update keep the zip, which needs no mounting.
+DMG="$DIST/OllamaGUI-macOS.dmg"
+STAGE="$(mktemp -d)"
+cp -R "$APP" "$STAGE/"
+ln -s /Applications "$STAGE/Applications"
+# Recent macOS versions deprecate hdiutil for `diskutil image create`, which older ones lack.
+hdiutil create -quiet -ov -format UDZO -volname "$APP_NAME" -srcfolder "$STAGE" "$DMG"
+rm -rf "$STAGE"
+
 echo "✓ $APP"
-echo "✓ $ZIP ($(du -h "$ZIP" | cut -f1 | tr -d ' '))"
+for file in "$ZIP" "$DMG"; do
+    echo "✓ $file ($(du -h "$file" | cut -f1 | tr -d ' '))"
+done

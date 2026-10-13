@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-macOS.zip"><b>Download for macOS</b></a> ·
+  <a href="https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-macOS.dmg"><b>Download for macOS</b></a> ·
   <a href="https://github.com/Hugo291/ollama-gui/releases/download/v2.2.0/OllamaGUI-Windows-Setup.exe">Windows (version 2.2)</a> ·
   <a href="https://hugo291.github.io/ollama-gui/">Website</a> ·
   <a href="#français">Français</a>
@@ -64,7 +64,7 @@ This installs the latest release in your Applications folder and opens it. Run i
 
 Or by hand:
 
-1. Download [`OllamaGUI-macOS.zip`](https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-macOS.zip), unzip it and move **Ollama GUI** to your Applications folder.
+1. Download [`OllamaGUI-macOS.dmg`](https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-macOS.dmg), open it and drag **Ollama GUI** to the Applications folder.
 2. The app is signed ad hoc, not notarized: the first time, right-click it and choose **Open**, or run:
 
 ```bash
@@ -86,7 +86,7 @@ cd ollama-gui
 scripts/build-app.sh
 ```
 
-This builds a universal `dist/Ollama GUI.app` and `dist/OllamaGUI-macOS.zip`. Use `ARCHS=arm64 scripts/build-app.sh` for a faster Apple silicon-only build.
+This builds a universal `dist/Ollama GUI.app`, `dist/OllamaGUI-macOS.dmg` and `dist/OllamaGUI-macOS.zip` (used by `install.sh` and the in-app update). Use `ARCHS=arm64 scripts/build-app.sh` for a faster Apple silicon-only build.
 
 Run the unit tests and the localization check:
 
@@ -127,7 +127,7 @@ No analytics, no account. The app talks to the Ollama servers you configure, `ol
 
 Installation : dans le Terminal, `curl -fsSL https://raw.githubusercontent.com/Hugo291/ollama-gui/main/install.sh | sh` installe la dernière version dans Applications et l'ouvre. Ensuite, un bouton **Mettre à jour** apparaît dans la barre d'outils dès qu'une nouvelle version est publiée : un clic l'installe, relance l'app et affiche les nouveautés.
 
-À la main : téléchargez [`OllamaGUI-macOS.zip`](https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-macOS.zip), dézippez, glissez l'app dans Applications, puis clic droit → **Ouvrir** au premier lancement (app non notarisée). macOS 14 Sonoma ou plus récent.
+À la main : téléchargez [`OllamaGUI-macOS.dmg`](https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-macOS.dmg), ouvrez-le, glissez l'app dans Applications, puis clic droit → **Ouvrir** au premier lancement (app non notarisée). macOS 14 Sonoma ou plus récent.
 
 Windows : la version 2.2 (Rust et Slint) reste disponible, sans mises à jour : [`OllamaGUI-Windows-Setup.exe`](https://github.com/Hugo291/ollama-gui/releases/download/v2.2.0/OllamaGUI-Windows-Setup.exe).
 

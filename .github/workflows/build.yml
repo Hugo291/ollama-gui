@@ -35,14 +35,16 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: OllamaGUI-macOS
-          path: dist/OllamaGUI-macOS.zip
+          path: |
+            dist/OllamaGUI-macOS.zip
+            dist/OllamaGUI-macOS.dmg
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" dist/OllamaGUI-macOS.zip --clobber
+            gh release upload "$GITHUB_REF_NAME" dist/OllamaGUI-macOS.zip dist/OllamaGUI-macOS.dmg --clobber
           else
-            gh release create "$GITHUB_REF_NAME" dist/OllamaGUI-macOS.zip --title "Ollama GUI ${GITHUB_REF_NAME#v}" --generate-notes
+            gh release create "$GITHUB_REF_NAME" dist/OllamaGUI-macOS.zip dist/OllamaGUI-macOS.dmg --title "Ollama GUI ${GITHUB_REF_NAME#v}" --generate-notes
           fi
