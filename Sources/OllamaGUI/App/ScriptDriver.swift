@@ -17,7 +17,7 @@ import SwiftUI
 /// `search:text`, `filter:all|local|cloud|vision|tools|thinking|embedding|image`, `reveal:name`,
 /// `discover-search:text`, `discover-select:library/name`, `discover-more`, `load:model`, `thinking:on|off`, `send`, `wait-reply`,
 /// `delete-selection`, `cancel-dialogs`, `appearance:system|light|dark`, `size:width,height`,
-/// `chat:model`, `draft:text`, `markdown-sample`, `settings[:servers|general|off]`, `app-update`, `shot:name`, `print`, `quit`.
+/// `chat:model`, `draft:text`, `markdown-sample`, `settings[:servers|general|off]`, `app-update`, `front`, `shot:name`, `print`, `quit`.
 @MainActor
 enum ScriptDriver {
     static var script: String? { ProcessInfo.processInfo.environment["OLLAMA_GUI_SCRIPT"] }
@@ -131,6 +131,12 @@ enum ScriptDriver {
             // Like the Update button: replaces this copy of the app with the latest release and restarts it.
             await app.checkAppUpdate()
             await app.installAppUpdate()
+        case "front":
+            // Only the active app tints its prominent buttons: for a capture that shows one.
+            NSApp.setActivationPolicy(.regular)
+            window?.level = .normal
+            NSApp.activate(ignoringOtherApps: true)
+            window?.makeKeyAndOrderFront(nil)
         case "shot":
             await shot(argument)
         case "print":
@@ -149,11 +155,16 @@ enum ScriptDriver {
         guard let window, let folder = ProcessInfo.processInfo.environment["OLLAMA_GUI_SHOTS"] else { return }
         try? FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
         let path = (folder as NSString).appendingPathComponent("\(name).png")
+        // Neither the window nor its sheet can be captured while a sheet is open: the sheet is drawn.
+        if let view = window.attachedSheet?.contentView, let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+            view.cacheDisplay(in: view.bounds, to: bitmap)
+            let saved = (try? bitmap.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))) != nil
+            log("shot \(name): \(saved ? "ok" : "failed")")
+            return
+        }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-        // With a sheet open, the window can't be captured: the sheet is.
-        let target = window.attachedSheet ?? window
-        process.arguments = ["-x", "-o", "-l", String(target.windowNumber), path]
+        process.arguments = ["-x", "-o", "-l", String(window.windowNumber), path]
         let errors = Pipe()
         process.standardError = errors
         do {

@@ -68,6 +68,15 @@ struct MarkdownTests {
         ])
     }
 
+    @Test func imageIsAParagraphWithOnlyAPicture() {
+        let image = MarkdownParser.image("![The Update button](https://example.com/update.png)")
+        #expect(image?.alt == "The Update button")
+        #expect(image?.url.absoluteString == "https://example.com/update.png")
+        #expect(MarkdownParser.image("See ![x](https://example.com/x.png)") == nil)
+        #expect(MarkdownParser.image("![x](http://example.com/x.png)") == nil)
+        #expect(MarkdownParser.image("[x](https://example.com/x.png)") == nil)
+    }
+
     @Test func quotes() {
         let blocks = MarkdownParser.blocks("> Quoted\n> *text*\n\nNext")
         #expect(blocks == [.quote("Quoted\n*text*"), .paragraph("Next")])

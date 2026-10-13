@@ -177,6 +177,13 @@ public enum MarkdownParser {
         return blocks
     }
 
+    /// The picture of a paragraph that is one image, `![alt](https://…)`.
+    public static func image(_ paragraph: String) -> (alt: String, url: URL)? {
+        guard let match = paragraph.wholeMatch(of: #/\s*!\[([^\]]*)\]\((https://[^)\s]+)\)\s*/#),
+              let url = URL(string: String(match.2)) else { return nil }
+        return (String(match.1), url)
+    }
+
     // MARK: Lines
 
     /// The opening fence (three or more backticks or tildes), if the line is one.

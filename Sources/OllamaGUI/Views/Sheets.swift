@@ -379,7 +379,7 @@ struct ReleaseNotesSheet: View {
             Text("What's New in Ollama GUI \(AppUpdater.currentVersion ?? "")")
                 .font(.title2.weight(.semibold))
             ScrollView {
-                MarkdownText(text: notes)
+                MarkdownText(text: notes, showsImages: true)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }

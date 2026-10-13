@@ -243,11 +243,13 @@ private struct StatsLine: View {
 /// Renders a reply's Markdown: paragraphs, headings, code, quotes, lists, tables and rules.
 struct MarkdownText: View {
     let text: String
+    /// Release notes only: a reply must not make the app load an address chosen by a model.
+    var showsImages = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             ForEach(Array(MarkdownParser.blocks(text).enumerated()), id: \.offset) { _, block in
-                MarkdownBlockView(block: block)
+                MarkdownBlockView(block: block, showsImages: showsImages)
             }
         }
     }
@@ -255,11 +257,23 @@ struct MarkdownText: View {
 
 private struct MarkdownBlockView: View {
     let block: MarkdownBlock
+    let showsImages: Bool
 
     var body: some View {
         switch block {
         case .paragraph(let text):
-            InlineMarkdown(text: text)
+            if showsImages, let image = MarkdownParser.image(text) {
+                // The description stays when the picture can't be loaded.
+                AsyncImage(url: image.url) { picture in
+                    picture.resizable().scaledToFit()
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .accessibilityLabel(Text(verbatim: image.alt))
+                } placeholder: {
+                    Text(verbatim: image.alt).foregroundStyle(.secondary)
+                }
+            } else {
+                InlineMarkdown(text: text)
+            }
         case .heading(let level, let text):
             InlineMarkdown(text: text)
                 .font(level == 1 ? .title2.bold() : level == 2 ? .title3.bold() : .headline)
