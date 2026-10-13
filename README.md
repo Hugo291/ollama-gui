@@ -136,5 +136,3 @@ Windows : la version 2.2 (Rust et Slint) reste disponible, sans mises à jour : 
 [MIT](LICENSE). Ollama GUI is an independent project, not affiliated with Ollama.
 
 The Windows version 2.2 is built with [Slint](https://slint.dev), used under the Slint Royalty-free License.
-
-<a href="https://slint.dev"><img src="https://raw.githubusercontent.com/slint-ui/slint/master/logo/MadeWithSlint-logo-light.svg" alt="Made with Slint" height="56"></a>
