@@ -92,6 +92,8 @@
     .install { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
     .install ol { margin: 8px 0 0; padding-left: 20px; color: var(--text-2); font-size: 15px; }
     .install li { margin-bottom: 6px; }
+    .install p { margin-top: 8px; }
+    .install code { overflow-wrap: anywhere; }
 
     footer { padding: 36px 0 48px; color: var(--text-2); font-size: 14px; text-align: center; }
     footer .slint { display: inline-block; margin-top: 14px; }
@@ -219,6 +221,8 @@
         <div class="install">
           <div class="card">
             <h3>macOS</h3>
+            <p><span lang="en">In Terminal:</span><span lang="fr">Dans le Terminal :</span> <code>curl -fsSL https://raw.githubusercontent.com/Hugo291/ollama-gui/main/install.sh | sh</code></p>
+            <p><span lang="en">Or by hand:</span><span lang="fr">Ou à la main :</span></p>
             <ol>
               <li><span lang="en">Download <a href="https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-macOS.zip">OllamaGUI-macOS.zip</a>, unzip it and move Ollama GUI to Applications.</span><span lang="fr">Téléchargez <a href="https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-macOS.zip">OllamaGUI-macOS.zip</a>, dézippez et glissez Ollama GUI dans Applications.</span></li>
               <li><span lang="en">The app is not notarized: the first time, right-click it and choose <b>Open</b>.</span><span lang="fr">L'app n'est pas notarisée : la première fois, clic droit puis <b>Ouvrir</b>.</span></li>

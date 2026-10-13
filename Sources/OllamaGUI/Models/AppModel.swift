@@ -51,6 +51,12 @@ struct DeleteRequest: Identifiable {
     let names: [String]
 }
 
+/// What a new version changes, shown once after the app updated itself.
+struct ReleaseNotes: Identifiable {
+    let id = UUID()
+    let text: String
+}
+
 @MainActor
 @Observable
 final class AppModel {
@@ -79,6 +85,11 @@ final class AppModel {
     private(set) var ollamaUpdateState: OllamaUpdateState = .idle
     var ollamaInstallProgress = OllamaInstallProgress()
     var selectedOllamaReleaseTag: String?
+    /// A newer release of Ollama GUI, when there is one.
+    private(set) var appUpdate: OllamaRelease?
+    /// Download progress of the app update being installed.
+    private(set) var appUpdateProgress: Double?
+    var releaseNotes: ReleaseNotes?
     /// Models being loaded or unloaded.
     private(set) var busyModels: Set<String> = []
 
@@ -124,6 +135,19 @@ final class AppModel {
             Task { await self.refreshModels() }
         }
         startMonitoring()
+
+        let defaults = UserDefaults.standard
+        if let notes = defaults.string(forKey: AppUpdater.releaseNotesKey), !notes.isEmpty {
+            releaseNotes = ReleaseNotes(text: notes)
+        }
+        defaults.removeObject(forKey: AppUpdater.releaseNotesKey)
+        Task {
+            // The app can stay in the menu bar for days: look again from time to time.
+            while !Task.isCancelled {
+                await self.checkAppUpdate()
+                try? await Task.sleep(for: .seconds(6 * 3600))
+            }
+        }
     }
 
     var client: OllamaClient { OllamaClient(baseURL: settings.currentServer.url) }
@@ -558,6 +582,39 @@ final class AppModel {
         } catch {
             OllamaLauncher.launch()
             ollamaUpdateState = .failed(error.localizedDescription)
+        }
+    }
+
+    // MARK: - App updates
+
+    func checkAppUpdate() async {
+        guard appUpdateProgress == nil, let version = AppUpdater.currentVersion else { return }
+        // Quietly: this runs in the background, and the next check tries again.
+        if let release = try? await OllamaReleaseClient().appUpdate(for: version) { appUpdate = release }
+    }
+
+    private func reportAppUpdateProgress(_ fraction: Double) {
+        // Reports can arrive out of order, or after a failure.
+        guard let current = appUpdateProgress else { return }
+        appUpdateProgress = max(current, fraction)
+    }
+
+    /// Installs the new version over this one, then restarts into it.
+    func installAppUpdate() async {
+        guard let release = appUpdate, appUpdateProgress == nil else { return }
+        appUpdateProgress = 0
+        do {
+            try await AppUpdater.install(release) { [weak self] fraction in
+                await self?.reportAppUpdateProgress(fraction)
+            }
+            UserDefaults.standard.set(release.notes, forKey: AppUpdater.releaseNotesKey)
+            try await OllamaUpdater.launch(Bundle.main.bundleURL, activates: true)
+            NSApp.terminate(nil)
+            // An open sheet cancels the request: the old version must not stay beside the new one.
+            exit(0)
+        } catch {
+            appUpdateProgress = nil
+            present(error, title: String(localized: "Ollama GUI could not be updated"))
         }
     }
 }

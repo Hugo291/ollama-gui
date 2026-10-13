@@ -284,3 +284,11 @@
 
 "Decision" = "Décision";
 "Ollama could not be stopped. The installed application has not been replaced." = "Impossible d’arrêter Ollama. L’application installée n’a pas été remplacée.";
+
+/* App updates */
+"Install Ollama GUI %@ and restart it" = "Installer Ollama GUI %@ et le redémarrer";
+"Installing Ollama GUI %@…" = "Installation d’Ollama GUI %@…";
+"Ollama GUI could not be updated" = "Impossible de mettre à jour Ollama GUI";
+"The downloaded archive does not contain this version of Ollama GUI." = "L’archive téléchargée ne contient pas cette version d’Ollama GUI.";
+"Ollama GUI cannot replace itself here. Move it to the Applications folder, then try again." = "Ollama GUI ne peut pas se remplacer ici. Déplacez-le dans le dossier Applications, puis réessayez.";
+"What's New in Ollama GUI %@" = "Nouveautés d’Ollama GUI %@";

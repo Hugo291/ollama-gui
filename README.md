@@ -43,6 +43,7 @@
 **And also**
 - Several Ollama servers (this Mac, a machine on your network, a remote host) with a quick switcher.
 - Menu bar item with the loaded models and active downloads.
+- **Updates itself**: an Update button appears in the toolbar when a new version is published. One click installs it, restarts the app and shows what changed.
 - Resizable sidebar, inspector, Discover list and table columns; right-click the column titles to hide or show columns.
 - Light and dark appearance, English and French.
 - Keyboard shortcuts: ⌘1–⌘5 sections, ⌘N pull a model, ⌘R refresh, ⇧⌘U check for updates, ⌘↩ chat with the selected model, ⌘D duplicate, ⌘⌫ delete, ⌘A select all, ⌘. stop generating, ⌘, settings.
@@ -54,6 +55,14 @@
 ## Install
 
 Install and start [Ollama](https://ollama.com/download) first, on this Mac or on a machine the app can reach.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Hugo291/ollama-gui/main/install.sh | sh
+```
+
+This installs the latest release in your Applications folder and opens it. Run it again to update, or use the **Update** button of the app.
+
+Or by hand:
 
 1. Download [`OllamaGUI-macOS.zip`](https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-macOS.zip), unzip it and move **Ollama GUI** to your Applications folder.
 2. The app is signed ad hoc, not notarized: the first time, right-click it and choose **Open**, or run:
@@ -96,6 +105,7 @@ CI builds, tests and smoke-tests the app on every push, and attaches the build t
 - Everything goes through the [Ollama REST API](https://docs.ollama.com/api) of the selected server (`/api/tags`, `/api/ps`, `/api/show`, `/api/pull`, `/api/create`, `/api/copy`, `/api/delete`, `/api/chat`).
 - **Updates**: the digest of a local model is the SHA-256 of its manifest. The app asks `registry.ollama.ai` for the digest of the current manifest (a `HEAD` request) and compares.
 - **Ollama versions**: reads the 100 most recent official GitHub releases and lists those with a macOS archive and checksums. Installation verifies the archive, stops the application and its bundled server, replaces the application, restarts it and checks the server version.
+- **App updates**: asks GitHub for the latest release at launch, then every six hours. Updating downloads the release archive, checks that it holds that version of the app, replaces the application and restarts it.
 - **Discover**: ollama.com has no public search API, so the app reads its public search and tags pages. If the site layout changes, Discover may show fewer details until the parser is updated; pulling by name always works.
 - **Servers**: an address without a port uses Ollama's default port 11434 (`192.168.1.20` → `http://192.168.1.20:11434`). The `OLLAMA_HOST` environment variable sets the default server.
 
@@ -109,13 +119,15 @@ CI builds, tests and smoke-tests the app on every push, and attaches the build t
 
 ## Privacy
 
-No analytics, no account. The app talks to the Ollama servers you configure, `ollama.com` when you open Discover, `registry.ollama.ai` when you check for model updates, and GitHub when you browse or install official Ollama releases in Settings.
+No analytics, no account. The app talks to the Ollama servers you configure, `ollama.com` when you open Discover, `registry.ollama.ai` when you check for model updates, and GitHub to look for a new version of the app and when you browse or install official Ollama releases in Settings.
 
 ## Français
 
 **Ollama GUI** est une app macOS native pour gérer vos modèles Ollama : liste des modèles installés (taille, paramètres, quantification, capacités), **sélection multiple** (⌘-clic, Maj-clic, ⌘A) pour mettre à jour, décharger ou supprimer plusieurs modèles d'un coup, détails complets, **recherche de mises à jour** sur le registre Ollama, téléchargement avec progression, bibliothèque ollama.com (recherche, tags, téléchargement en un clic), modèles en mémoire (chargement, déchargement, compte à rebours), duplication, renommage, **personnalisation** (prompt système et paramètres), suppression, et un **bac à sable** pour discuter avec un modèle et mesurer sa vitesse. Plusieurs serveurs, icône dans la barre des menus, apparence claire ou sombre, raccourcis clavier (⌘1–⌘5, ⌘N, ⌘R, ⇧⌘U, ⌘↩, ⌘D, ⌘⌫, ⌘A), interface en français et en anglais.
 
-Installation : téléchargez [`OllamaGUI-macOS.zip`](https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-macOS.zip), dézippez, glissez l'app dans Applications, puis clic droit → **Ouvrir** au premier lancement (app non notarisée). macOS 14 Sonoma ou plus récent.
+Installation : dans le Terminal, `curl -fsSL https://raw.githubusercontent.com/Hugo291/ollama-gui/main/install.sh | sh` installe la dernière version dans Applications et l'ouvre. Ensuite, un bouton **Mettre à jour** apparaît dans la barre d'outils dès qu'une nouvelle version est publiée : un clic l'installe, relance l'app et affiche les nouveautés.
+
+À la main : téléchargez [`OllamaGUI-macOS.zip`](https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-macOS.zip), dézippez, glissez l'app dans Applications, puis clic droit → **Ouvrir** au premier lancement (app non notarisée). macOS 14 Sonoma ou plus récent.
 
 Windows : la version 2.2 (Rust et Slint) reste disponible, sans mises à jour : [`OllamaGUI-Windows-Setup.exe`](https://github.com/Hugo291/ollama-gui/releases/download/v2.2.0/OllamaGUI-Windows-Setup.exe).
 

@@ -17,7 +17,7 @@ import SwiftUI
 /// `search:text`, `filter:all|local|cloud|vision|tools|thinking|embedding|image`, `reveal:name`,
 /// `discover-search:text`, `discover-select:library/name`, `discover-more`, `load:model`, `thinking:on|off`, `send`, `wait-reply`,
 /// `delete-selection`, `cancel-dialogs`, `appearance:system|light|dark`, `size:width,height`,
-/// `chat:model`, `draft:text`, `markdown-sample`, `settings[:servers|general|off]`, `shot:name`, `print`, `quit`.
+/// `chat:model`, `draft:text`, `markdown-sample`, `settings[:servers|general|off]`, `app-update`, `shot:name`, `print`, `quit`.
 @MainActor
 enum ScriptDriver {
     static var script: String? { ProcessInfo.processInfo.environment["OLLAMA_GUI_SCRIPT"] }
@@ -127,6 +127,10 @@ enum ScriptDriver {
             // The Settings window doesn't open in the background: show its content here.
             app.debugSettingsTab = SettingsView.Tab(rawValue: argument) ?? .servers
             app.debugShowsSettings = argument != "off"
+        case "app-update":
+            // Like the Update button: replaces this copy of the app with the latest release and restarts it.
+            await app.checkAppUpdate()
+            await app.installAppUpdate()
         case "shot":
             await shot(argument)
         case "print":

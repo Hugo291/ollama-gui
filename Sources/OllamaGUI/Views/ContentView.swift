@@ -14,6 +14,31 @@ struct ContentView: View {
         } detail: {
             detail
         }
+        .toolbar {
+            // Only when a newer version of the app is published.
+            if let release = app.appUpdate {
+                ToolbarItem {
+                    if let progress = app.appUpdateProgress {
+                        ProgressView(value: progress)
+                            .progressViewStyle(.circular)
+                            .controlSize(.small)
+                            .help(Text("Installing Ollama GUI \(release.version)…"))
+                    } else {
+                        Button {
+                            Task { await app.installAppUpdate() }
+                        } label: {
+                            Label("Update", systemImage: "arrow.down.circle.fill")
+                        }
+                        .labelStyle(.titleAndIcon)
+                        .buttonStyle(.borderedProminent)
+                        .help(Text("Install Ollama GUI \(release.version) and restart it"))
+                    }
+                }
+            }
+        }
+        .sheet(item: $app.releaseNotes) { notes in
+            ReleaseNotesSheet(notes: notes.text)
+        }
         .sheet(isPresented: $app.isPullSheetPresented) {
             PullModelSheet(initialName: app.pullSheetPrefill)
         }

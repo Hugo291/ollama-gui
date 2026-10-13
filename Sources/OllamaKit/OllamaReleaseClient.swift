@@ -1,6 +1,6 @@
 import Foundation
 
-/// A version published by Ollama on GitHub.
+/// A version published on GitHub: Ollama, or Ollama GUI itself.
 public struct OllamaRelease: Decodable, Equatable, Sendable {
     public struct Asset: Decodable, Equatable, Sendable {
         public let name: String
@@ -24,19 +24,23 @@ public struct OllamaRelease: Decodable, Equatable, Sendable {
     public let isDraft: Bool
     public let isPrerelease: Bool
     public let assets: [Asset]
+    /// The release notes, in Markdown.
+    public let notes: String?
 
     enum CodingKeys: String, CodingKey {
         case tagName = "tag_name"
         case isDraft = "draft"
         case isPrerelease = "prerelease"
         case assets
+        case notes = "body"
     }
 
-    public init(tagName: String, isDraft: Bool = false, isPrerelease: Bool = false, assets: [Asset] = []) {
+    public init(tagName: String, isDraft: Bool = false, isPrerelease: Bool = false, assets: [Asset] = [], notes: String? = nil) {
         self.tagName = tagName
         self.isDraft = isDraft
         self.isPrerelease = isPrerelease
         self.assets = assets
+        self.notes = notes
     }
 
     public var version: String { tagName.trimmingPrefix("v") }
@@ -47,9 +51,14 @@ public struct OllamaRelease: Decodable, Equatable, Sendable {
 }
 
 /// Reads Ollama's official GitHub releases and selects the appropriate update channel.
+/// Also finds the updates of Ollama GUI itself.
 public struct OllamaReleaseClient: Sendable {
+    /// The archive attached to every Ollama GUI release.
+    public static let appArchiveName = "OllamaGUI-macOS.zip"
+
     private let session: URLSession
     private let releasesURL = URL(string: "https://api.github.com/repos/ollama/ollama/releases?per_page=100")!
+    private let appReleaseURL = URL(string: "https://api.github.com/repos/Hugo291/ollama-gui/releases/latest")!
 
     public init(session: URLSession = .shared) {
         self.session = session
@@ -68,13 +77,28 @@ public struct OllamaReleaseClient: Sendable {
 
     /// Recent installable macOS releases, including older versions and previews.
     public func availableVersions(includePrereleases: Bool = true) async throws -> [OllamaRelease] {
-        var request = URLRequest(url: releasesURL, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 20)
+        let releases: [OllamaRelease] = try await fetch(releasesURL)
+        return Self.availableVersions(in: releases, includePrereleases: includePrereleases)
+    }
+
+    /// The latest stable release of Ollama GUI, when it is newer than `currentVersion`.
+    public func appUpdate(for currentVersion: String) async throws -> OllamaRelease? {
+        Self.appUpdate(for: currentVersion, in: try await fetch(appReleaseURL))
+    }
+
+    static func appUpdate(for currentVersion: String, in release: OllamaRelease) -> OllamaRelease? {
+        guard let current = OllamaVersion(currentVersion), let latest = OllamaVersion(release.version),
+              latest > current, release.asset(named: appArchiveName) != nil else { return nil }
+        return release
+    }
+
+    private func fetch<T: Decodable>(_ url: URL) async throws -> T {
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 20)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("ollama-gui", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await session.data(for: request)
         try OllamaClient.validate(response, data: data)
-        let releases = try JSONDecoder().decode([OllamaRelease].self, from: data)
-        return Self.availableVersions(in: releases, includePrereleases: includePrereleases)
+        return try JSONDecoder().decode(T.self, from: data)
     }
 
     /// Stable installations stay on stable releases. Pre-release installations keep

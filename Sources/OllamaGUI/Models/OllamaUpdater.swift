@@ -88,6 +88,8 @@ enum OllamaUpdateError: LocalizedError {
     case invalidArchive
     case permissionDenied
     case applicationStillRunning
+    case unexpectedRelease
+    case notReplaceable
 
     var errorDescription: String? {
         switch self {
@@ -103,6 +105,10 @@ enum OllamaUpdateError: LocalizedError {
             return String(localized: "Ollama GUI does not have permission to replace Ollama in Applications.")
         case .applicationStillRunning:
             return String(localized: "Ollama could not be stopped. The installed application has not been replaced.")
+        case .unexpectedRelease:
+            return String(localized: "The downloaded archive does not contain this version of Ollama GUI.")
+        case .notReplaceable:
+            return String(localized: "Ollama GUI cannot replace itself here. Move it to the Applications folder, then try again.")
         }
     }
 }
@@ -207,14 +213,14 @@ struct OllamaUpdater {
     }
 
     @MainActor
-    static func launch(_ applicationURL: URL) async throws {
+    static func launch(_ applicationURL: URL, activates: Bool = false) async throws {
         let configuration = NSWorkspace.OpenConfiguration()
-        configuration.activates = false
+        configuration.activates = activates
         configuration.createsNewApplicationInstance = true
         _ = try await NSWorkspace.shared.openApplication(at: applicationURL, configuration: configuration)
     }
 
-    private static func download(_ asset: OllamaRelease.Asset, to localURL: URL,
+    fileprivate static func download(_ asset: OllamaRelease.Asset, to localURL: URL,
                                  stage: OllamaInstallProgress.Stage,
                                  progress: @escaping @Sendable (OllamaInstallProgress) async -> Void) async throws {
         let expectedSize = max(0, asset.size ?? 0)
@@ -247,7 +253,7 @@ struct OllamaUpdater {
         }
     }
 
-    private static func extract(archive: URL, into directory: URL) throws {
+    fileprivate static func extract(archive: URL, into directory: URL) throws {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
         process.arguments = ["-x", "-k", archive.path, directory.path]
@@ -259,12 +265,53 @@ struct OllamaUpdater {
         guard process.terminationStatus == 0 else { throw OllamaUpdateError.invalidArchive }
     }
 
-    private static func replace(_ applicationURL: URL, with newApplicationURL: URL) throws {
+    fileprivate static func replace(_ applicationURL: URL, with newApplicationURL: URL) throws {
         let manager = FileManager.default
         let parent = applicationURL.deletingLastPathComponent()
         let staged = parent.appending(path: ".Ollama-update-\(UUID().uuidString).app", directoryHint: .isDirectory)
         defer { try? manager.removeItem(at: staged) }
         try manager.copyItem(at: newApplicationURL, to: staged)
         _ = try manager.replaceItemAt(applicationURL, withItemAt: staged, options: .usingNewMetadataOnly)
+    }
+}
+
+/// Updates Ollama GUI itself from its GitHub releases.
+enum AppUpdater {
+    /// Development builds run outside an application bundle and have no version: they are never updated.
+    static let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+    /// Where the release notes wait for the new version, which shows them once.
+    static let releaseNotesKey = "releaseNotes"
+
+    /// Downloads `release` and replaces the running application with it. The caller restarts it.
+    static func install(_ release: OllamaRelease, progress: @escaping @Sendable (Double) async -> Void) async throws {
+        guard let archive = release.asset(named: OllamaReleaseClient.appArchiveName) else {
+            throw OllamaUpdateError.unexpectedRelease
+        }
+        let temporary = FileManager.default.temporaryDirectory
+            .appending(path: "ollama-gui-update-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: temporary, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: temporary) }
+
+        let archiveURL = temporary.appending(path: archive.name)
+        try await OllamaUpdater.download(archive, to: archiveURL, stage: .downloadingArchive) {
+            await progress($0.fraction ?? 0)
+        }
+        try await Task.detached { try OllamaUpdater.extract(archive: archiveURL, into: temporary) }.value
+
+        // A release whose app has another version would be offered again after each update.
+        let application = temporary.appending(path: "Ollama GUI.app", directoryHint: .isDirectory)
+        guard let bundle = Bundle(url: application),
+              bundle.bundleIdentifier == Bundle.main.bundleIdentifier,
+              bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String == release.version else {
+            throw OllamaUpdateError.unexpectedRelease
+        }
+
+        let current = Bundle.main.bundleURL
+        do {
+            try await Task.detached { try OllamaUpdater.replace(current, with: application) }.value
+        } catch let error as CocoaError where [.fileWriteNoPermission, .fileWriteVolumeReadOnly].contains(error.code) {
+            // Not an administrator, or an app opened from the Downloads folder (read-only translocation).
+            throw OllamaUpdateError.notReplaceable
+        }
     }
 }

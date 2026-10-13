@@ -88,6 +88,19 @@ struct OllamaReleaseTests {
                 == ["0.36.0", "0.35.1", "0.35.0"])
     }
 
+    @Test func appUpdateIsANewerReleaseWithItsArchive() throws {
+        let json = """
+        {"tag_name":"v3.1.0","draft":false,"prerelease":false,"body":"## What's new",
+         "assets":[{"name":"OllamaGUI-macOS.zip","browser_download_url":"https://example.com/OllamaGUI-macOS.zip","size":3105552}]}
+        """
+        let release = try JSONDecoder().decode(OllamaRelease.self, from: Data(json.utf8))
+        #expect(release.notes == "## What's new")
+        #expect(OllamaReleaseClient.appUpdate(for: "3.0.0", in: release) == release)
+        #expect(OllamaReleaseClient.appUpdate(for: "3.1.0", in: release) == nil)
+        #expect(OllamaReleaseClient.appUpdate(for: "3.2.0", in: release) == nil)
+        #expect(OllamaReleaseClient.appUpdate(for: "3.0.0", in: OllamaRelease(tagName: "v3.1.0")) == nil)
+    }
+
     private static func macAssets() -> [OllamaRelease.Asset] {
         [
             .init(name: "Ollama-darwin.zip", downloadURL: URL(string: "https://example.com/Ollama-darwin.zip")!),

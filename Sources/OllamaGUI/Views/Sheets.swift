@@ -366,3 +366,30 @@ struct CreateModelSheet: View {
         }
     }
 }
+
+// MARK: - Release notes
+
+/// Shown once after the app updated itself.
+struct ReleaseNotesSheet: View {
+    let notes: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("What's New in Ollama GUI \(AppUpdater.currentVersion ?? "")")
+                .font(.title2.weight(.semibold))
+            ScrollView {
+                MarkdownText(text: notes)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            HStack {
+                Spacer()
+                Button("OK") { dismiss() }
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 580, height: 520)
+    }
+}
