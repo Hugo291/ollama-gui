@@ -68,8 +68,18 @@
     .button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
     .button svg { width: 18px; height: 18px; flex: none; }
     .button small { font-weight: 400; opacity: 0.8; }
-    .hero .command { margin: 18px 0 0; font-size: 15px; color: var(--text-2); }
-    .hero .command code { display: inline-block; padding: 6px 12px; border-radius: 10px; color: var(--text); }
+
+    /* A Terminal command with its copy button: dark in both appearances, like a terminal. */
+    .command { display: inline-flex; align-items: center; gap: 14px; max-width: 100%; margin-top: 8px; padding: 8px 8px 8px 16px; border-radius: 12px; border: 1px solid #333338; background: #1d1d1f; color: #f5f5f7; text-align: left; }
+    .command code { min-width: 0; padding: 0; border: 0; background: none; font-size: 14px; }
+    .command code::before { content: "$ "; color: #8e8e93; }
+    .command button { flex: none; padding: 6px 12px; border-radius: 8px; border: 1px solid #48484d; background: #2c2c2e; color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
+    .command button:hover { border-color: var(--accent); }
+    .command button > span { display: flex; align-items: center; gap: 6px; }
+    .command button svg { width: 15px; height: 15px; }
+    .command .done, .command .copied .idle { display: none; }
+    .command .copied .done { display: flex; color: #30d158; }
+
     .hero .meta { margin-top: 14px; font-size: 14px; color: var(--text-2); }
 
     .shot { margin: 34px auto 0; border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); border: 1px solid var(--stroke); }
@@ -147,7 +157,14 @@
           <span><span lang="en">Windows (version 2.2)</span><span lang="fr">Windows (version 2.2)</span></span>
         </a>
       </div>
-      <p class="command"><span lang="en">or in Terminal:</span><span lang="fr">ou dans le Terminal :</span> <code>curl -fsSL https://raw.githubusercontent.com/Hugo291/ollama-gui/main/install.sh | sh</code></p>
+      <p class="meta"><span lang="en">or in Terminal:</span><span lang="fr">ou dans le Terminal :</span></p>
+      <div class="command">
+        <code>curl -fsSL https://raw.githubusercontent.com/Hugo291/ollama-gui/main/install.sh | sh</code>
+        <button type="button">
+          <span class="idle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span lang="en">Copy</span><span lang="fr">Copier</span></span>
+          <span class="done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span lang="en">Copied</span><span lang="fr">Copié</span></span>
+        </button>
+      </div>
       <p class="meta">
         <span lang="en">Free and open source (MIT) · macOS 14+ (Apple silicon and Intel) · Windows 10 and 11 (64-bit): version 2.2, no longer updated · <a href="https://github.com/Hugo291/ollama-gui/releases">All releases</a></span>
         <span lang="fr">Gratuit et open source (MIT) · macOS 14+ (Apple silicon et Intel) · Windows 10 et 11 (64 bits) : version 2.2, sans mises à jour · <a href="https://github.com/Hugo291/ollama-gui/releases">Toutes les versions</a></span>
@@ -223,7 +240,14 @@
         <div class="install">
           <div class="card">
             <h3>macOS</h3>
-            <p><span lang="en">In Terminal:</span><span lang="fr">Dans le Terminal :</span> <code>curl -fsSL https://raw.githubusercontent.com/Hugo291/ollama-gui/main/install.sh | sh</code></p>
+            <p><span lang="en">In Terminal:</span><span lang="fr">Dans le Terminal :</span></p>
+            <div class="command">
+              <code>curl -fsSL https://raw.githubusercontent.com/Hugo291/ollama-gui/main/install.sh | sh</code>
+              <button type="button">
+                <span class="idle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span lang="en">Copy</span><span lang="fr">Copier</span></span>
+                <span class="done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg><span lang="en">Copied</span><span lang="fr">Copié</span></span>
+              </button>
+            </div>
             <p><span lang="en">Or by hand:</span><span lang="fr">Ou à la main :</span></p>
             <ol>
               <li><span lang="en">Download <a href="https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-macOS.dmg">OllamaGUI-macOS.dmg</a>, open it and drag Ollama GUI to Applications.</span><span lang="fr">Téléchargez <a href="https://github.com/Hugo291/ollama-gui/releases/latest/download/OllamaGUI-macOS.dmg">OllamaGUI-macOS.dmg</a>, ouvrez-le et glissez Ollama GUI dans Applications.</span></li>
@@ -271,6 +295,16 @@
         var next = root.lang === "fr" ? "en" : "fr";
         apply(next);
         try { localStorage.setItem("lang", next); } catch (e) {}
+      });
+
+      // Copy buttons of the Terminal commands.
+      document.querySelectorAll(".command button").forEach(function (copy) {
+        copy.addEventListener("click", function () {
+          navigator.clipboard.writeText(copy.previousElementSibling.textContent).then(function () {
+            copy.classList.add("copied");
+            setTimeout(function () { copy.classList.remove("copied"); }, 2000);
+          });
+        });
       });
 
       // Highlight the download for the visitor's system.
